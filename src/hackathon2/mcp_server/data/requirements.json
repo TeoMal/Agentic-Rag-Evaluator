@@ -1,0 +1,26 @@
+{
+  "_status": "DRAFT - replace with the controls extracted from the real policy PDFs, then have a human review them. source_chunk_id must be a real chunk_id from the index.",
+  "controls": [
+    {"id": "SEC-04", "domain": "security", "mandatory": true,
+     "control": "Encryption at rest and in transit for confidential data",
+     "source_chunk_id": "information-security-policy#s4.2#c1"},
+    {"id": "SEC-07", "domain": "security", "mandatory": true,
+     "control": "Confidential data stored and processed only in the EU/EEA",
+     "source_chunk_id": "data-classification-policy#s3.1#c1"},
+    {"id": "SEC-09", "domain": "security", "mandatory": true,
+     "control": "Security incident notification to NFS within 24 hours",
+     "source_chunk_id": "information-security-policy#s6.1#c1"},
+    {"id": "PRC-02", "domain": "procurement", "mandatory": true,
+     "control": "Total cost of ownership within the approved budget, or CFO approval",
+     "source_chunk_id": "procurement-policy#s5.3#c1"},
+    {"id": "LEG-01", "domain": "legal", "mandatory": true,
+     "control": "Contract includes audit rights, a data processing agreement and exit/data-return terms",
+     "source_chunk_id": "vendor-risk-policy#s2.4#c1"},
+    {"id": "AIG-03", "domain": "ai_governance", "mandatory": true,
+     "control": "No training or fine-tuning on NFS data without written consent",
+     "source_chunk_id": "ai-governance-policy#s3.2#c1"},
+    {"id": "AIG-05", "domain": "ai_governance", "mandatory": true,
+     "control": "Human oversight and model transparency reporting for high-impact AI outputs",
+     "source_chunk_id": "ai-governance-policy#s4.1#c1"}
+  ]
+}

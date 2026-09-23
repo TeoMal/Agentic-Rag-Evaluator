@@ -1,0 +1,13 @@
+{
+  "_status": "Fictional NFS internal record: earlier decisions, used as precedent for conditions.",
+  "assessments": [
+    {"assessment_id": "prior-0001", "vendor_id": "lumen-analytics", "category": "generative-ai-platform",
+     "date": "2025-11-20", "recommendation": "CONDITIONAL_APPROVAL", "risk_rating": "medium",
+     "human_approval": "approved", "reviewer": "Head of Vendor Risk",
+     "conditions": ["EU-only hosting written into the contract", "No training on NFS data", "Annual third-party security audit"]},
+    {"assessment_id": "prior-0002", "vendor_id": "quillbot-enterprise", "category": "generative-ai-platform",
+     "date": "2026-02-14", "recommendation": "REJECT", "risk_rating": "high",
+     "human_approval": "approved", "reviewer": "CISO",
+     "conditions": []}
+  ]
+}

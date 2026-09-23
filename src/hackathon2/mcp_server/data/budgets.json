@@ -1,0 +1,15 @@
+{
+  "_status": "Fictional NFS internal record (not in the knowledge pack). Keep consistent with procurement-policy.pdf.",
+  "budgets": {
+    "generative-ai-platform": {
+      "record_id": "budget:generative-ai-platform:fy2026",
+      "category": "generative-ai-platform",
+      "currency": "EUR",
+      "period_years": 3,
+      "budget_total": 1200000.0,
+      "committed": 0.0,
+      "approver_above_budget": "CFO",
+      "owner": "Chief Digital Officer"
+    }
+  }
+}

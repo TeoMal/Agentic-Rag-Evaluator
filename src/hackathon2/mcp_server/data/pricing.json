@@ -1,0 +1,15 @@
+{
+  "_status": "VERIFY - copy every number from knowledge/vendor-x-pricing.pdf and set source_chunk_id to the pricing chunk's real id.",
+  "vendors": {
+    "asteria-ai-systems": {
+      "currency": "EUR",
+      "tiers": [
+        {"min_seats": 1, "per_seat_monthly": 15.0}
+      ],
+      "platform_fee_yearly": 40000.0,
+      "setup_fee": 30000.0,
+      "annual_increase_pct": 0.0,
+      "source_chunk_id": "vendor-x-pricing#s2#c1"
+    }
+  }
+}
