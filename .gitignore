@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets -- real values live only in .env (template: .env.example)
+.env
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# Per-run deploy logs written by scripts/deploy.py
+logs/

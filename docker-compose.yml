@@ -1,0 +1,62 @@
+# Local stack: the API + Postgres/pgvector (vector store and durable HITL checkpoints).
+#
+#   uv run scripts/deploy.py      rebuild + recreate + verify in one pass (recommended)
+#   docker compose up -d --build  also works; the app runs without .env, just with no LLM
+#
+# ${VARS} are read from the shell or from .env. Both ports bind to 127.0.0.1 only:
+# the database credentials below are local-only demo values.
+
+name: hackathon2
+
+services:
+  db:
+    # Postgres with pgvector preinstalled, as in course units 43 and 62.
+    image: pgvector/pgvector:pg17
+    container_name: hackathon2-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hackathon2}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hackathon2-local}
+      POSTGRES_DB: ${POSTGRES_DB:-hackathon2}
+    ports:
+      # 5446 -- course units already use 5433/5442/5444/5445.
+      - "127.0.0.1:${POSTGRES_PORT:-5446}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      args:
+        IMAGE_TAG: ${IMAGE_TAG:-dev}
+    # Never :latest -- every build gets its own tag (git SHA), set by deploy.py.
+    image: hackathon2-app:${IMAGE_TAG:-dev}
+    container_name: hackathon2-app
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # In-network address of the db service; overrides the localhost values
+      # .env carries for running the app directly on the host.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-hackathon2}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hackathon2-local}
+      POSTGRES_DB: ${POSTGRES_DB:-hackathon2}
+    ports:
+      # 8020 -- HACKATHON_1 uses 8010, course unit 65 (Chroma) uses 8000.
+      - "127.0.0.1:${APP_PORT:-8020}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Health is the image's own HEALTHCHECK (Dockerfile); `up --wait` blocks on it.
+
+volumes:
+  pgdata:

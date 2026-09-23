@@ -1,0 +1,63 @@
+[project]
+name = "hackathon2"
+version = "0.1.0"
+description = "Hackathon 2 - AI-powered Vendor Risk & Procurement Deep Agent (Deep Agents, RAG, MCP, guardrails, evaluation) on Azure."
+readme = "README.md"
+authors = [
+    { name = "TeoMal", email = "theodoris.mallios@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "azure-monitor-opentelemetry>=1.8.10",
+    "deepagents>=0.7.17",
+    "fastapi>=0.141.1",
+    "langchain>=1.4.2",
+    "langchain-core>=1.6.4",
+    "langchain-mcp-adapters>=0.3.2",
+    "langchain-openai>=1.6.3",
+    "langchain-postgres>=0.0.18",
+    "langchain-text-splitters>=1.1.2",
+    "langgraph>=1.2.12",
+    "langgraph-checkpoint-postgres>=3.1.2",
+    "mcp>=1.30.0",
+    "psycopg[binary,pool]>=3.3.6",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "pypdf>=6.19.0",
+    "python-dotenv>=1.2.3",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[project.scripts]
+hackathon2 = "hackathon2:main"
+
+[build-system]
+requires = ["uv_build>=0.12.7,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Copy instead of hardlink. Documents/ is OneDrive-synced on our Windows machines and
+# OneDrive rejects hardlinks into the uv cache (os error 396) -- copy works everywhere.
+link-mode = "copy"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `async def test_...` runs without a decorator on each one.
+asyncio_mode = "auto"
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+# Ruff defaults + import sorting. Fix locally with: uv run ruff check --fix
+extend-select = ["I"]

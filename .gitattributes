@@ -1,0 +1,21 @@
+# Normalise line endings so a clean clone runs everywhere (same rules as HACKATHON_1).
+# Developed on Windows (core.autocrlf=true) but scripts, compose files and the image
+# build run on Linux: a CRLF checkout fails with `/usr/bin/env: 'sh\r': No such file`.
+* text=auto eol=lf
+
+*.sh            text eol=lf
+*.py            text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.bicep         text eol=lf
+.env.example    text eol=lf
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+
+# PowerShell is Windows-only; CRLF is its native convention.
+*.ps1           text eol=crlf
+
+# Binary -- never touch (the knowledge pack is PDFs).
+*.pdf           binary
+*.png           binary
+*.jpg           binary

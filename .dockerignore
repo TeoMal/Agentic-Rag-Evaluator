@@ -1,0 +1,12 @@
+# Allowlist: the build context is ONLY what the image needs. Everything else --
+# .env with real keys, .venv, .git, logs, tests -- never reaches the daemon, so it
+# can never be baked into a layer by accident (deleting a file in a later layer
+# does NOT remove it from the image history).
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!knowledge/
+**/__pycache__
+**/*.py[co]
