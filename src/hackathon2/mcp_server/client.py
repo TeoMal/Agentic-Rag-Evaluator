@@ -15,10 +15,21 @@ What every tool call goes through (the interceptor, in this order):
   1. role check   -- a tool outside the caller's allow-list is refused with status "denied",
                      without ever reaching the server (defence in depth next to list filtering);
   2. the call     -- over the open stdio session, with a read timeout;
-  3. failure net  -- a transport failure (server crashed, timeout) becomes status "unavailable",
-                     so the agent records MISSING evidence instead of the run crashing (FR15);
+  3. failure net  -- a transport failure is retried once (not timeouts); if it still fails it
+                     becomes status "unavailable", so the agent records MISSING evidence instead of
+                     the run crashing (FR15);
   4. record       -- an entry in `toolbox.calls` (role, tool, status, duration) for the
                      evaluation's tool-correctness and latency metrics.
+
+Fallback (FR15): if the server subprocess cannot start, open_mcp_toolbox runs the SAME server
+inside this process over an in-memory MCP connection. The agent code cannot tell the difference
+and every rule (roles, approval tokens, safe_tool) still applies; the toolbox is marked degraded.
+γτι
+Degraded mode: `toolbox.degraded` is True when the fallback was used or any tool answered
+"unavailable"; `toolbox.degraded_reasons` says why. Copy both into the final assessment:
+
+    assessment.degraded_mode = toolbox.degraded
+    assessment.gate_notes += [f"degraded: {r}" for r in toolbox.degraded_reasons]
 
 Tracing: these tools are ordinary LangChain tools, so the Langfuse CallbackHandler the
 agent runs with already records every call (input, output with our status envelope,
@@ -29,6 +40,7 @@ only (the human-approval endpoint); it is the only role that may call record_ass
 LLM is ever handed that tool.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -45,6 +57,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.interceptors import MCPToolCallRequest
 from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp import ClientSession
+from mcp.shared.memory import create_connected_server_and_client_session
 from mcp.types import CallToolResult, TextContent
 
 from hackathon2.schemas import ToolResult, ToolStatus
@@ -53,6 +66,8 @@ logger = logging.getLogger("hackathon2.mcp_client")
 
 SERVER_NAME = "nfs-enterprise"  # must match server.SERVER_NAME (a test checks it)
 DEFAULT_TIMEOUT_SECONDS = 30
+TRANSPORT_RETRIES = 1
+RETRY_BACKOFF_SECONDS = 0.5
 
 Role = Literal["orchestrator", "security", "procurement", "legal", "ai_governance", "system"]
 
@@ -105,22 +120,43 @@ def _as_call_result(result: ToolResult) -> CallToolResult:
     return CallToolResult(content=[TextContent(type="text", text=result.model_dump_json())], isError=False)
 
 
-def _status_of(result: Any) -> ToolStatus:
-    """Read our envelope's status from a raw MCP result."""
+def _envelope_of(result: Any) -> tuple[ToolStatus, str | None]:
+    """(status, error) of our envelope inside a raw MCP result."""
     if getattr(result, "isError", False):
-        return "error"  # rejected by FastMCP before our code ran (e.g. wrong argument type)
+        return "error", "rejected by the MCP server (invalid arguments)"
     try:
-        return json.loads(result.content[0].text)["status"]
+        payload = json.loads(result.content[0].text)
+        return payload["status"], payload.get("error")
     except (AttributeError, IndexError, KeyError, TypeError, ValueError):
-        return "error"
+        return "error", "unreadable tool result"
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    return isinstance(exc, TimeoutError) or "timed out" in str(exc).lower()
 
 
 class McpToolbox:
     """Tools of one open server session, handed out per role."""
 
-    def __init__(self, session: ClientSession) -> None:
+    def __init__(
+        self,
+        session: ClientSession,
+        mode: Literal["stdio", "in_process"] = "stdio",
+        degraded_reasons: list[str] | None = None,
+    ) -> None:
         self._session = session
+        self.mode = mode
         self.calls: list[ToolCall] = []
+        self.degraded_reasons: list[str] = list(degraded_reasons or [])
+
+    @property
+    def degraded(self) -> bool:
+        """True if the fallback server is in use or any evidence source was unavailable."""
+        return bool(self.degraded_reasons)
+
+    def _note_degraded(self, reason: str) -> None:
+        if reason not in self.degraded_reasons:
+            self.degraded_reasons.append(reason)
 
     def interceptor(self, role: Role):
         """The wrapper around every tool call made on behalf of `role` (see module docstring)."""
@@ -134,16 +170,28 @@ class McpToolbox:
                     ToolResult.fail("denied", f"role '{role}' is not authorised to call {request.name}")
                 )
             else:
-                try:
-                    result = await handler(request)
-                except Exception as exc:  # noqa: BLE001 -- any transport failure must become "unavailable"
-                    logger.warning("MCP call %s failed: %r", request.name, exc)
-                    result = _as_call_result(
-                        ToolResult.fail("unavailable", f"{request.name}: MCP server unavailable ({type(exc).__name__})")
-                    )
+                for attempt in range(TRANSPORT_RETRIES + 1):
+                    try:
+                        result = await handler(request)
+                        break
+                    except Exception as exc:  # noqa: BLE001 -- any transport failure must become "unavailable"
+                        if attempt < TRANSPORT_RETRIES and not _is_timeout(exc):
+                            logger.warning("MCP call %s failed (%r), retrying once", request.name, exc)
+                            await asyncio.sleep(RETRY_BACKOFF_SECONDS)
+                            continue
+                        logger.warning("MCP call %s failed: %r", request.name, exc)
+                        result = _as_call_result(
+                            ToolResult.fail(
+                                "unavailable", f"{request.name}: MCP server unavailable ({type(exc).__name__})"
+                            )
+                        )
+                        break
 
+            status, error = _envelope_of(result)
+            if status == "unavailable":
+                self._note_degraded(error or f"{request.name}: unavailable")
             duration_ms = round((time.perf_counter() - started) * 1000, 1)
-            self.calls.append(ToolCall(role, request.name, _status_of(result), duration_ms, dict(request.args)))
+            self.calls.append(ToolCall(role, request.name, status, duration_ms, dict(request.args)))
             return result
 
         return intercept
@@ -176,21 +224,65 @@ class McpToolbox:
 
 
 @asynccontextmanager
+async def _in_process_session(timeout_seconds: float) -> AsyncIterator[ClientSession]:
+    """The same FastMCP server, run inside this process over an in-memory MCP connection."""
+    from hackathon2.mcp_server.server import mcp as local_server  # imported only when needed
+
+    async with create_connected_server_and_client_session(
+        local_server, read_timeout_seconds=timedelta(seconds=timeout_seconds)
+    ) as session:
+        yield session
+
+
+@asynccontextmanager
 async def open_mcp_toolbox(
-    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS, connection: dict | None = None
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    connection: dict | None = None,
+    fallback: bool = True,
 ) -> AsyncIterator[McpToolbox]:
     """Start the MCP server (one subprocess) and keep one session open for the whole block.
 
-    Raises McpUnavailableError if the server cannot start -- the caller decides what to do
-    (step 5 adds an in-process fallback). Errors raised inside the block propagate unchanged.
+    If the subprocess cannot start and `fallback` is True, the same server runs in-process
+    instead and the toolbox is marked degraded. Raises McpUnavailableError only if both fail
+    (or the subprocess fails and fallback=False). Errors raised inside the block propagate unchanged.
     """
     client = MultiServerMCPClient({SERVER_NAME: connection or server_connection(timeout_seconds)})
-    entered = False
+    started = False
+    body_error: BaseException | None = None
     try:
         async with client.session(SERVER_NAME) as session:
-            entered = True
-            yield McpToolbox(session)
+            started = True
+            try:
+                yield McpToolbox(session)
+            except BaseException as exc:
+                body_error = exc
+                raise
+            return
     except Exception as exc:
-        if entered:
+        if body_error is not None:
+            raise body_error from None  # unwrap the SDK's ExceptionGroup: callers get their own error
+        if started:
             raise
-        raise McpUnavailableError(f"could not start MCP server '{SERVER_NAME}': {exc!r}") from exc
+        if not fallback:
+            raise McpUnavailableError(f"could not start MCP server '{SERVER_NAME}': {exc!r}") from exc
+        subprocess_error = exc
+
+    reason = f"MCP server subprocess could not start ({type(subprocess_error).__name__}); using in-process fallback"
+    logger.warning("%s: %r", reason, subprocess_error)
+    started = False
+    try:
+        async with _in_process_session(timeout_seconds) as session:
+            started = True
+            try:
+                yield McpToolbox(session, mode="in_process", degraded_reasons=[reason])
+            except BaseException as exc:
+                body_error = exc
+                raise
+    except Exception as exc:
+        if body_error is not None:
+            raise body_error from None
+        if started:
+            raise
+        raise McpUnavailableError(
+            f"MCP server unavailable: subprocess failed ({subprocess_error!r}) and in-process fallback failed ({exc!r})"
+        ) from exc
