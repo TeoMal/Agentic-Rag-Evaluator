@@ -20,6 +20,8 @@ class Reason(StrEnum):
     INVALID_INPUT = "invalid_input"
     LIMIT_EXCEEDED = "limit_exceeded"
     INSTRUCTION_OVERRIDE = "instruction_override"
+    EVIDENCE_OVERRIDE = "evidence_override"
+    ASSESSMENT_MANIPULATION = "assessment_manipulation"
     ROLE_SPOOFING = "role_spoofing"
     SECRET_EXFILTRATION = "secret_exfiltration"
     UNAUTHORIZED_ACTION = "unauthorized_action"
@@ -221,7 +223,7 @@ def _snapshot(value: object, limits: Limits, *, tool_payload: bool = False) -> o
             return item
         if type(item) is datetime and not tool_payload:
             return item
-        if isinstance(item, BaseModel) and not tool_payload:
+        if not tool_payload and isinstance(item, BaseModel):
             return visit(vars(item), depth + 1)
         if type(item) is dict:
             if len(item) > limits.max_nodes:

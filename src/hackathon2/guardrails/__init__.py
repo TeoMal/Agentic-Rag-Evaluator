@@ -5,6 +5,7 @@ permission for that boundary only, never proof of factual correctness or approva
 """
 
 from .authorization import authorize_tool_call
+from .content import ContentResult, prepare_untrusted_content
 from .gate import gate_assessment
 from .injection import scan_document
 from .policy import (
@@ -29,6 +30,7 @@ __all__ = [
     "UNTRUSTED_CONTENT_INSTRUCTION",
     "ApprovalVerifier",
     "CallerContext",
+    "ContentResult",
     "Decision",
     "DocumentScanner",
     "GateContext",
@@ -42,5 +44,6 @@ __all__ = [
     "check_privacy",
     "gate_assessment",
     "prepare_retrieved_hits",
+    "prepare_untrusted_content",
     "scan_document",
 ]
