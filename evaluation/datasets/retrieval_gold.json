@@ -1,0 +1,106 @@
+{
+  "description": "Retrieval relevance gold set. Labels are document-level (grade 3 = holds the answer, 2 = strong context, 1 = useful context), derived from the knowledge-pack file names in handout section 6. Once the PDFs are in knowledge/, narrow them with a 'section' prefix per target.",
+  "cases": [
+    {
+      "id": "RET-01",
+      "domain": "security",
+      "query": "What encryption is required for confidential data at rest and in transit?",
+      "relevant": [
+        {
+          "doc_id": "information-security-policy",
+          "grade": 3
+        },
+        {
+          "doc_id": "data-classification-policy",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "RET-02",
+      "domain": "security",
+      "query": "Does Asteria hold SOC 2 Type II or ISO 27001 certification?",
+      "relevant": [
+        {
+          "doc_id": "vendor-x-security-questionnaire",
+          "grade": 3
+        },
+        {
+          "doc_id": "vendor-x-proposal",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "RET-03",
+      "domain": "data",
+      "query": "Can confidential documents be processed by an external AI service, and under which conditions?",
+      "relevant": [
+        {
+          "doc_id": "data-classification-policy",
+          "grade": 3
+        },
+        {
+          "doc_id": "ai-governance-policy",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "RET-04",
+      "domain": "procurement",
+      "query": "What approvals and how many competing quotes are required for a multi-year software contract?",
+      "relevant": [
+        {
+          "doc_id": "procurement-policy",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "RET-05",
+      "domain": "procurement",
+      "query": "What is Asteria's per-user licence price and the total cost for 2,000 seats?",
+      "relevant": [
+        {
+          "doc_id": "vendor-x-pricing",
+          "grade": 3
+        },
+        {
+          "doc_id": "vendor-x-proposal",
+          "grade": 1
+        }
+      ]
+    },
+    {
+      "id": "RET-06",
+      "domain": "legal",
+      "query": "Which contract clauses are mandatory: right to audit, liability caps, data processing agreement?",
+      "relevant": [
+        {
+          "doc_id": "vendor-risk-policy",
+          "grade": 3
+        },
+        {
+          "doc_id": "procurement-policy",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "RET-07",
+      "domain": "ai_governance",
+      "query": "May an AI vendor train its models on NFS data, and does Asteria do so?",
+      "relevant": [
+        {
+          "doc_id": "ai-governance-policy",
+          "grade": 3
+        },
+        {
+          "doc_id": "vendor-x-proposal",
+          "grade": 3
+        }
+      ]
+    }
+  ]
+}

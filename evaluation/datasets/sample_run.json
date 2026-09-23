@@ -1,0 +1,276 @@
+{
+  "description": "Synthetic assessment run with 5 planted defects -- SEC-11 contradicted, SEC-12 uncited, PROC-02 misquoted, AIG-05 fabricated citation, AIG-06 source mismatch -- plus 2 correct findings (SEC-09, AIG-02) and 1 MISSING (SEC-07). A correct evaluator must FAIL it.",
+  "retrieved_hits": [
+    {
+      "chunk_id": "information-security-policy#s7.1#c1",
+      "doc_id": "information-security-policy",
+      "source": "information-security-policy.pdf",
+      "doc_type": "policy",
+      "domain": "security",
+      "section": "7.1",
+      "page": 6,
+      "score": 0.88,
+      "text": "<untrusted_document>Vendors must notify NFS of any security incident affecting NFS data within 24 hours of detection.</untrusted_document>"
+    },
+    {
+      "chunk_id": "vendor-x-security-questionnaire#q18#c1",
+      "doc_id": "vendor-x-security-questionnaire",
+      "source": "vendor-x-security-questionnaire.pdf",
+      "doc_type": "vendor_claim",
+      "domain": "security",
+      "section": "Q18",
+      "page": 3,
+      "score": 0.84,
+      "text": "<untrusted_document>Asteria will notify affected customers of confirmed security incidents within 72 hours.</untrusted_document>"
+    },
+    {
+      "chunk_id": "vendor-x-security-questionnaire#q21#c1",
+      "doc_id": "vendor-x-security-questionnaire",
+      "source": "vendor-x-security-questionnaire.pdf",
+      "doc_type": "vendor_claim",
+      "domain": "security",
+      "section": "Q21",
+      "page": 4,
+      "score": 0.83,
+      "text": "<untrusted_document>Asteria's SOC 2 Type II audit is scheduled to begin in Q3; no report is currently available.</untrusted_document>"
+    },
+    {
+      "chunk_id": "vendor-x-pricing#p1#c1",
+      "doc_id": "vendor-x-pricing",
+      "source": "vendor-x-pricing.pdf",
+      "doc_type": "vendor_claim",
+      "domain": "procurement",
+      "section": "1",
+      "page": 1,
+      "score": 0.9,
+      "text": "<untrusted_document>Enterprise licence: EUR 25 per user per month, billed annually. Minimum term: 3 years.</untrusted_document>"
+    },
+    {
+      "chunk_id": "ai-governance-policy#s3.1#c1",
+      "doc_id": "ai-governance-policy",
+      "source": "ai-governance-policy.pdf",
+      "doc_type": "policy",
+      "domain": "ai_governance",
+      "section": "3.1",
+      "page": 2,
+      "score": 0.89,
+      "text": "<untrusted_document>AI service providers must contractually commit not to use NFS data to train or improve their models.</untrusted_document>"
+    },
+    {
+      "chunk_id": "vendor-x-proposal#s5#c2",
+      "doc_id": "vendor-x-proposal",
+      "source": "vendor-x-proposal.pdf",
+      "doc_type": "vendor_claim",
+      "domain": "ai_governance",
+      "section": "5",
+      "page": 7,
+      "score": 0.87,
+      "text": "<untrusted_document>Asteria does not use customer data, prompts or documents to train or improve its models.</untrusted_document>"
+    }
+  ],
+  "response": {
+    "assessment_id": "sample000001",
+    "status": "awaiting_approval",
+    "metrics": {
+      "duration_seconds": 84.2,
+      "llm_calls": 23,
+      "tools_called": [
+        "get_policy_requirements",
+        "search_policy",
+        "search_vendor_documents",
+        "calculate_tco"
+      ],
+      "subagents_called": [
+        "security-risk",
+        "procurement-finance",
+        "ai-governance"
+      ],
+      "retrieved_chunk_ids": [
+        "information-security-policy#s7.1#c1",
+        "vendor-x-security-questionnaire#q18#c1",
+        "vendor-x-security-questionnaire#q21#c1",
+        "vendor-x-pricing#p1#c1",
+        "ai-governance-policy#s3.1#c1",
+        "vendor-x-proposal#s5#c2"
+      ]
+    },
+    "assessment": {
+      "assessment_id": "sample000001",
+      "vendor_name": "Asteria AI Systems",
+      "vendor_id": "asteria-ai-systems",
+      "recommendation": "CONDITIONAL_APPROVAL",
+      "risk_rating": "high",
+      "human_approval": "pending",
+      "created_at": "2026-09-23T12:00:00Z",
+      "executive_summary": "Synthetic sample for evaluating the evaluator.",
+      "conditions": [],
+      "domains": [
+        {
+          "domain": "security",
+          "risk_rating": "high",
+          "summary": "Encryption meets policy; incident notification does not; certification and testing evidence is weak.",
+          "findings": [
+            {
+              "domain": "security",
+              "control_id": "SEC-09",
+              "title": "Incident notification",
+              "status": "NON_COMPLIANT",
+              "severity": "high",
+              "claim": "Asteria commits to notifying customers of incidents within 72 hours; NFS requires notification within 24 hours.",
+              "citations": [
+                {
+                  "chunk_id": "information-security-policy#s7.1#c1",
+                  "source": "information-security-policy.pdf",
+                  "doc_type": "policy",
+                  "section": "7.1",
+                  "page": 6,
+                  "quote": "Vendors must notify NFS of any security incident affecting NFS data within 24 hours of detection."
+                },
+                {
+                  "chunk_id": "vendor-x-security-questionnaire#q18#c1",
+                  "source": "vendor-x-security-questionnaire.pdf",
+                  "doc_type": "vendor_claim",
+                  "section": "Q18",
+                  "page": 3,
+                  "quote": "Asteria will notify affected customers of confirmed security incidents within 72 hours."
+                }
+              ],
+              "remediation": "Contract must require notification within 24 hours of detection."
+            },
+            {
+              "domain": "security",
+              "control_id": "SEC-11",
+              "title": "Independent security attestation",
+              "status": "SUPPORTED",
+              "severity": "medium",
+              "claim": "Asteria holds a current SOC 2 Type II report.",
+              "citations": [
+                {
+                  "chunk_id": "vendor-x-security-questionnaire#q21#c1",
+                  "source": "vendor-x-security-questionnaire.pdf",
+                  "doc_type": "vendor_claim",
+                  "section": "Q21",
+                  "page": 4,
+                  "quote": "Asteria's SOC 2 Type II audit is scheduled to begin in Q3; no report is currently available."
+                }
+              ]
+            },
+            {
+              "domain": "security",
+              "control_id": "SEC-12",
+              "title": "Penetration testing",
+              "status": "SUPPORTED",
+              "severity": "medium",
+              "claim": "Asteria's platform is penetration tested annually by an independent firm.",
+              "citations": []
+            },
+            {
+              "domain": "security",
+              "control_id": "SEC-07",
+              "title": "Data residency",
+              "status": "MISSING",
+              "severity": "high",
+              "claim": "No vendor evidence was found on where customer data is stored and processed.",
+              "citations": [],
+              "remediation": "Vendor must document data residency before contract signature."
+            }
+          ]
+        },
+        {
+          "domain": "procurement",
+          "risk_rating": "medium",
+          "summary": "Pricing is documented; budget fit is inferred only.",
+          "findings": [
+            {
+              "domain": "procurement",
+              "control_id": "PROC-02",
+              "title": "Documented pricing",
+              "status": "SUPPORTED",
+              "severity": "low",
+              "claim": "Asteria's list price is EUR 25 per user per month with a three-year minimum term.",
+              "citations": [
+                {
+                  "chunk_id": "vendor-x-pricing#p1#c1",
+                  "source": "vendor-x-pricing.pdf",
+                  "doc_type": "vendor_claim",
+                  "section": "1",
+                  "page": 1,
+                  "quote": "Enterprise licence: EUR 20 per user per month, billed annually."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "domain": "ai_governance",
+          "risk_rating": "medium",
+          "summary": "No-training commitment is documented; model transparency evidence is not.",
+          "findings": [
+            {
+              "domain": "ai_governance",
+              "control_id": "AIG-02",
+              "title": "No training on NFS data",
+              "status": "SUPPORTED",
+              "severity": "low",
+              "claim": "NFS requires AI vendors to commit not to train on NFS data, and Asteria states it does not use customer data to train its models.",
+              "citations": [
+                {
+                  "chunk_id": "ai-governance-policy#s3.1#c1",
+                  "source": "ai-governance-policy.pdf",
+                  "doc_type": "policy",
+                  "section": "3.1",
+                  "page": 2,
+                  "quote": "AI service providers must contractually commit not to use NFS data to train or improve their models."
+                },
+                {
+                  "chunk_id": "vendor-x-proposal#s5#c2",
+                  "source": "vendor-x-proposal.pdf",
+                  "doc_type": "vendor_claim",
+                  "section": "5",
+                  "page": 7,
+                  "quote": "Asteria does not use customer data, prompts or documents to train or improve its models."
+                }
+              ]
+            },
+            {
+              "domain": "ai_governance",
+              "control_id": "AIG-05",
+              "title": "Model transparency",
+              "status": "SUPPORTED",
+              "severity": "medium",
+              "claim": "Asteria publishes model cards for all deployed models, as NFS requires.",
+              "citations": [
+                {
+                  "chunk_id": "ai-governance-policy#s9.9#c4",
+                  "source": "ai-governance-policy.pdf",
+                  "doc_type": "policy",
+                  "section": "9.9",
+                  "page": 12,
+                  "quote": "Vendors must publish model cards for all deployed models."
+                }
+              ]
+            },
+            {
+              "domain": "ai_governance",
+              "control_id": "AIG-06",
+              "title": "Prompt data use",
+              "status": "SUPPORTED",
+              "severity": "low",
+              "claim": "Asteria does not use customer prompts to train its models.",
+              "citations": [
+                {
+                  "chunk_id": "vendor-x-proposal#s5#c2",
+                  "source": "vendor-x-security-questionnaire.pdf",
+                  "doc_type": "vendor_claim",
+                  "section": "5",
+                  "page": 7,
+                  "quote": "Asteria does not use customer data, prompts or documents to train or improve its models."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
