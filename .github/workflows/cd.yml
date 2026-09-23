@@ -5,6 +5,9 @@
 # (`uv run scripts/deploy.py azure`), so CI and laptops cannot drift apart:
 # Bicep infra -> build -> push to ACR -> roll out -> verify /health reports this SHA.
 #
+# Until AZURE_CREDENTIALS is set, CI still runs and the deploy job is skipped
+# with a warning, so the workflow stays green.
+#
 # One-time setup (see deployment/README.md):
 #   secrets  AZURE_CREDENTIALS      service principal JSON (az ad sp create-for-rbac --sdk-auth)
 #            AZURE_OPENAI_API_KEY
@@ -31,9 +34,29 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
+  # Until the Azure secrets exist, skip the deploy (with a warning) instead of
+  # failing every push to main at "Azure login". Adding the secrets turns it on.
+  azure-configured:
+    name: Check Azure credentials
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          if [ -n "$AZURE_CREDENTIALS" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Deploy skipped::AZURE_CREDENTIALS is not set. Add the secrets listed in deployment/README.md to enable deploys to Azure."
+          fi
+
   deploy:
     name: Deploy to Azure Container Apps
-    needs: ci
+    needs: [ci, azure-configured]
+    if: needs.azure-configured.outputs.ready == 'true'
     runs-on: ubuntu-latest
     # A GitHub environment: add "required reviewers" to it for a manual approval gate.
     environment: production
