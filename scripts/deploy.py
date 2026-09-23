@@ -3,13 +3,11 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""One-pass rebuild + deploy for the Hackathon 2 service.
+"""One-pass local rebuild + deploy for the Hackathon 2 service.
 
-    uv run scripts/deploy.py                   local: test, rebuild image, recreate container, verify
-    uv run scripts/deploy.py azure             Azure: Bicep infra, build, push to ACR, roll out, verify
-    uv run scripts/deploy.py status [--azure]  what is running, and which image it is
+    uv run scripts/deploy.py                   test, rebuild image, recreate container, verify
+    uv run scripts/deploy.py status            what is running, and which image it is
     uv run scripts/deploy.py down [--volumes]  stop the local stack
-    uv run scripts/deploy.py teardown          delete this project's Azure resources (asks first)
 
 Flags: --tag TAG  --skip-tests  --no-cache  --dry-run  --yes  --timeout SECONDS
 
@@ -19,9 +17,8 @@ and the run only succeeds once /health answers with the image tag THIS run
 built. A stale container can never pass for a fresh deploy.
 
 Stdlib only, so `uv run` starts it instantly without syncing the project, and
-the same code runs on Windows, macOS, Linux and in GitHub Actions (cd.yml calls
-`deploy.py azure`) -- local and CI deploys cannot drift apart. Every run is
-logged to logs/deploy-NNNN-<timestamp>-<command>.log.
+the same code runs on Windows, macOS and Linux. Every run is logged to
+logs/deploy-NNNN-<timestamp>-<command>.log.
 """
 
 from __future__ import annotations
@@ -34,7 +31,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -46,7 +42,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = ROOT / ".env"
 ENV_EXAMPLE = ROOT / ".env.example"
-BICEP_FILE = ROOT / "deployment" / "main.bicep"
 LOG_DIR = ROOT / "logs"
 
 IMAGE_NAME = "hackathon2-app"
@@ -62,25 +57,10 @@ REQUIRED_LLM_KEYS = (
     "AZURE_OPENAI_DEPLOYMENT_NAME",
 )
 SECRET_KEYS = {"AZURE_OPENAI_API_KEY", "POSTGRES_PASSWORD"}
-AZURE_DEFAULTS = {
-    "AZURE_RESOURCE_GROUP": "rg-hackathon2",
-    "AZURE_LOCATION": "germanywestcentral",
-    "AZURE_CONTAINERAPP_NAME": "hackathon2-app",
-}
 # Real environment variables win over .env (same rule as Compose and pydantic-settings).
 ENV_OVERRIDE_PREFIXES = ("AZURE_", "OPENAI_", "APP_", "POSTGRES_")
-# main.bicep tags everything it creates with project=<PROJECT_TAG>; teardown deletes
-# exactly those, dependents first (the app before its environment, etc.).
-PROJECT_TAG = "hackathon2"
-TEARDOWN_ORDER = (
-    "microsoft.app/containerapps",
-    "microsoft.app/managedenvironments",
-    "microsoft.insights/components",
-    "microsoft.operationalinsights/workspaces",
-    "microsoft.containerregistry/registries",
-)
 DEFAULT_APP_PORT = "8020"
-DEFAULT_TIMEOUT = {"local": 180, "azure": 420}
+DEFAULT_TIMEOUT = 180
 DOCKER_START_TIMEOUT = 300  # a cold Docker Desktop start boots a WSL VM first
 
 
@@ -131,8 +111,7 @@ def set_env_value(text: str, key: str, value: str) -> str:
 
 def make_image_tag(sha: str | None, dirty: bool, now: datetime) -> str:
     """Commit SHA for a clean tree. A dirty tree or no git gets a timestamp, so every
-    rebuild of uncommitted code is a distinct tag -- Azure only rolls out a new
-    revision when the tag changes, and /health verification relies on it too."""
+    rebuild of uncommitted code is a distinct tag, which /health verification relies on."""
     stamp = now.strftime("%Y%m%d%H%M%S")
     if sha and not dirty:
         return sha
@@ -156,35 +135,6 @@ def redact(args: Iterable[str], secrets: Iterable[str]) -> str:
     return " ".join(f'"{arg}"' if not arg or any(c.isspace() for c in arg) else arg for arg in shown)
 
 
-def bicep_parameters(cfg: dict[str, str], *, deploy_app: bool, image_tag: str) -> dict:
-    """ARM parameters file for deployment/main.bicep. Written to a temp file so the
-    API key never appears on a command line or in the log."""
-    params: dict[str, object] = {
-        "location": cfg["AZURE_LOCATION"],
-        "appName": cfg["AZURE_CONTAINERAPP_NAME"],
-        "imageName": IMAGE_NAME,
-        "imageTag": image_tag,
-        "deployApp": deploy_app,
-        "azureOpenAiEndpoint": cfg.get("AZURE_OPENAI_ENDPOINT", ""),
-        "azureOpenAiApiVersion": cfg.get("OPENAI_API_VERSION", ""),
-        "azureOpenAiDeployment": cfg.get("AZURE_OPENAI_DEPLOYMENT_NAME", ""),
-        "azureOpenAiEmbeddingDeployment": cfg.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", ""),
-        "azureOpenAiApiKey": cfg.get("AZURE_OPENAI_API_KEY", ""),
-    }
-    if cfg.get("AZURE_ACR_NAME"):
-        params["acrName"] = cfg["AZURE_ACR_NAME"]
-    return {
-        "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
-        "contentVersion": "1.0.0.0",
-        "parameters": {name: {"value": value} for name, value in params.items()},
-    }
-
-
-def read_outputs(outputs: dict | None) -> dict[str, str]:
-    """Flatten ARM deployment outputs to {lowercased name: value}."""
-    return {name.lower(): str(entry.get("value", "")) for name, entry in (outputs or {}).items()}
-
-
 DOCKER_CRASH_MARKER = "backend crashed, dumping error to file and reporting to user: "
 
 
@@ -200,26 +150,6 @@ def crash_reason_from_log(lines: list[str], since: datetime) -> str | None:
             return None
         return line.split(DOCKER_CRASH_MARKER, 1)[1].strip() if stamp >= since.replace(microsecond=0) else None
     return None
-
-
-def teardown_plan(resource_ids: Iterable[str], keep_registry: str | None = None) -> list[str]:
-    """Order this project's resources for deletion (dependents first), dropping a
-    registry that was named explicitly -- it may be shared with other work."""
-
-    def resource_type(resource_id: str) -> str:
-        provider_path = resource_id.split("/providers/", 1)[-1].split("/")
-        return "/".join(provider_path[:2]).lower()
-
-    def resource_name(resource_id: str) -> str:
-        return resource_id.rstrip("/").rsplit("/", 1)[-1].lower()
-
-    ids = [
-        rid for rid in resource_ids
-        if not (keep_registry and resource_type(rid) == "microsoft.containerregistry/registries"
-                and resource_name(rid) == keep_registry.lower())
-    ]
-    rank = {t: i for i, t in enumerate(TEARDOWN_ORDER)}
-    return sorted(ids, key=lambda rid: rank.get(resource_type(rid), len(rank)))
 
 
 # ---------------------------------------------------------------------------
@@ -336,9 +266,9 @@ def next_log_path(command: str) -> Path:
 
 
 def load_config() -> dict[str, str]:
-    """Defaults < .env < real environment variables."""
+    """.env < real environment variables."""
     file_values = parse_env(ENV_FILE.read_text(encoding="utf-8")) if ENV_FILE.exists() else {}
-    config = {**AZURE_DEFAULTS, **{k: v for k, v in file_values.items() if v}}
+    config = {k: v for k, v in file_values.items() if v}
     config.update({k: v for k, v in os.environ.items() if k.startswith(ENV_OVERRIDE_PREFIXES) and v})
     return config
 
@@ -522,20 +452,13 @@ def describe_checks(body: dict) -> str:
     return "  ".join(f"{k}={v}" for k, v in body.get("checks", {}).items())
 
 
-def azure_account(runner: Runner) -> dict:
-    try:
-        return json.loads(runner.run(["az", "account", "show", "-o", "json"], mutating=False, capture=True).output)
-    except DeployError as exc:
-        raise DeployError(f"not logged in to Azure -- run `az login` first.\n{exc}") from None
-
-
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 
 
 def cmd_local(args: argparse.Namespace, console: Console, runner: Runner) -> None:
-    timeout = args.timeout or DEFAULT_TIMEOUT["local"]
+    timeout = args.timeout or DEFAULT_TIMEOUT
 
     console.step("1/6 Preflight")
     ensure_docker(runner, console)
@@ -588,112 +511,8 @@ def cmd_local(args: argparse.Namespace, console: Console, runner: Runner) -> Non
     console.say("  Logs      docker compose logs -f app")
 
 
-def cmd_azure(args: argparse.Namespace, console: Console, runner: Runner) -> None:
-    timeout = args.timeout or DEFAULT_TIMEOUT["azure"]
-
-    console.step("1/6 Preflight")
-    if shutil.which("az") is None:
-        raise DeployError("Azure CLI ('az') is not on PATH: https://learn.microsoft.com/cli/azure/install-azure-cli")
-    ensure_docker(runner, console)
-    config = load_config()
-    missing = [k for k in REQUIRED_LLM_KEYS if not config.get(k)]
-    if missing:
-        prompt_for_missing(console, missing)
-        config = load_config()
-    runner.secrets.update(v for k, v in config.items() if k in SECRET_KEYS and v)
-    account = azure_account(runner)
-    group, location, app = config["AZURE_RESOURCE_GROUP"], config["AZURE_LOCATION"], config["AZURE_CONTAINERAPP_NAME"]
-    tag = args.tag or git_image_tag(runner)
-    console.say(f"subscription    {account.get('name')} ({account.get('id')})")
-    console.say(f"resource group  {group}  ({location})")
-    console.say(f"container app   {app}")
-    console.say(f"image tag       {tag}")
-    confirm(args, f"Deploy {IMAGE_NAME}:{tag} to '{group}' in subscription '{account.get('name')}'?")
-
-    console.step("2/6 Lockfile and tests")
-    lock_and_test(args, console, runner)
-
-    console.step("3/6 Infrastructure (Bicep: registry, monitoring, environment)")
-    ensure_resource_group(runner, console, group, location)
-    outputs = bicep_deploy(runner, console, config, deploy_app=False, image_tag=tag)
-    acr_name = outputs.get("acrname", "<acr-name>")
-    image = f"{outputs.get('acrloginserver', '<acr-name>.azurecr.io')}/{IMAGE_NAME}:{tag}"
-
-    console.step("4/6 Build and push image")
-    # Container Apps runs linux/amd64; pinning it keeps Apple-silicon builds deployable.
-    build = ["docker", "build", "--platform", "linux/amd64", "--build-arg", f"IMAGE_TAG={tag}", "-t", image]
-    if args.no_cache:
-        build += ["--no-cache", "--pull"]
-    runner.run([*build, str(ROOT)])
-    runner.run(["az", "acr", "login", "-n", acr_name])
-    runner.run(["docker", "push", image])
-
-    console.step("5/6 Roll out the new revision")
-    outputs = bicep_deploy(runner, console, config, deploy_app=True, image_tag=tag)
-    fqdn = outputs.get("appfqdn", "")
-
-    console.step("6/6 Verify")
-    if runner.dry_run:
-        console.say("(dry run: skipping health verification)")
-        return
-    if not fqdn:
-        raise DeployError("the deployment returned no app FQDN -- check the Container App in the portal.")
-    body = wait_for_health(console, f"https://{fqdn}/health", tag, timeout)
-    console.say(f"healthy: {describe_checks(body)}")
-    console.say("")
-    console.say(f"  App        https://{fqdn}   (API docs: /docs)")
-    console.say(f"  Image      {image}")
-    console.say(f"  Telemetry  Application Insights '{outputs.get('appinsightsname', '')}' in {group}")
-    console.say(f"  Logs       az containerapp logs show -n {app} -g {group} --follow")
-
-
-def ensure_resource_group(runner: Runner, console: Console, group: str, location: str) -> None:
-    """Use the group if we can read it; create it only if it truly does not exist.
-
-    `az group show` needs access to this one group only. `az group exists` needs
-    subscription-wide read, which course/sandbox accounts (access to a single
-    assigned group) do not have -- it fails with a bare 'Forbidden'."""
-    show = runner.run(["az", "group", "show", "-n", group, "-o", "none"], mutating=False, capture=True, check=False)
-    if show.returncode == 0:
-        console.say(f"resource group '{group}': exists")
-        return
-    if "ResourceGroupNotFound" in show.error:
-        runner.run(["az", "group", "create", "-n", group, "-l", location, "-o", "none"])
-        return
-    visible = runner.run(["az", "group", "list", "--query", "[].name", "-o", "tsv"],
-                         mutating=False, capture=True, check=False, quiet=True).output.split()
-    hint = f"Groups you can use: {', '.join(visible)}." if visible else "You cannot see any resource group."
-    raise DeployError(
-        f"no access to resource group '{group}' (and no permission to create it).\n"
-        f"  {hint} Set AZURE_RESOURCE_GROUP in .env (or as a CI variable)."
-    )
-
-
-def bicep_deploy(runner: Runner, console: Console, config: dict[str, str], *, deploy_app: bool, image_tag: str) -> dict[str, str]:
-    params = bicep_parameters(config, deploy_app=deploy_app, image_tag=image_tag)
-    fd, params_path = tempfile.mkstemp(prefix="hackathon2-params-", suffix=".json")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(params, fh)
-        name = f"hackathon2-{'app' if deploy_app else 'infra'}-{local_now():%Y%m%d%H%M%S}"
-        console.say("(ARM deployment -- usually 1-3 minutes, no output until it finishes)")
-        result = runner.run(
-            ["az", "deployment", "group", "create", "-g", config["AZURE_RESOURCE_GROUP"], "-n", name,
-             "-f", str(BICEP_FILE), "-p", f"@{params_path}", "--query", "properties.outputs", "-o", "json"],
-            capture=True,
-        )
-    finally:
-        os.remove(params_path)
-    outputs = read_outputs(json.loads(result.output)) if result.output.strip() else {}
-    for key, value in outputs.items():
-        if value:
-            console.say(f"  {key} = {value}")
-    return outputs
-
-
 def cmd_status(args: argparse.Namespace, console: Console, runner: Runner) -> None:
     config = load_config()
-    console.step("Local")
     if shutil.which("docker") and docker_running(runner):
         runner.run([*COMPOSE, "ps", "-a"], mutating=False, check=False)
     else:
@@ -701,20 +520,6 @@ def cmd_status(args: argparse.Namespace, console: Console, runner: Runner) -> No
     url = f"http://127.0.0.1:{config.get('APP_PORT', DEFAULT_APP_PORT)}/health"
     body = fetch_health(url)
     console.say(json.dumps(body, indent=2) if body else f"{url}: not answering")
-
-    if not args.azure:
-        return
-    console.step("Azure")
-    fqdn = runner.run(
-        ["az", "containerapp", "show", "-n", config["AZURE_CONTAINERAPP_NAME"], "-g", config["AZURE_RESOURCE_GROUP"],
-         "--query", "properties.configuration.ingress.fqdn", "-o", "tsv"],
-        mutating=False, capture=True, check=False,
-    ).output.strip()
-    if not fqdn:
-        console.say(f"no container app '{config['AZURE_CONTAINERAPP_NAME']}' in '{config['AZURE_RESOURCE_GROUP']}'")
-        return
-    body = fetch_health(f"https://{fqdn}/health", timeout=15)
-    console.say(json.dumps(body, indent=2) if body else f"https://{fqdn}/health: not answering")
 
 
 def cmd_down(args: argparse.Namespace, console: Console, runner: Runner) -> None:
@@ -725,60 +530,17 @@ def cmd_down(args: argparse.Namespace, console: Console, runner: Runner) -> None
     runner.run(command)
 
 
-def cmd_teardown(args: argparse.Namespace, console: Console, runner: Runner) -> None:
-    """Default: delete only the resources main.bicep tagged project=hackathon2, so a
-    shared group (course subscription: one assigned group you cannot recreate) survives.
-    --whole-group deletes the resource group itself."""
-    config = load_config()
-    group = config["AZURE_RESOURCE_GROUP"]
-    account = azure_account(runner)
-
-    if args.whole_group:
-        console.say(
-            f"This DELETES resource group '{group}' and EVERYTHING in it -- including resources that are "
-            f"not part of this project -- in subscription '{account.get('name')}'."
-        )
-        if not (args.yes or args.dry_run):
-            if not sys.stdin.isatty():
-                raise DeployError("pass --yes to delete non-interactively")
-            if input("Type the resource group name to confirm: ").strip() != group:
-                raise DeployError("name did not match -- nothing was deleted")
-        runner.run(["az", "group", "delete", "-n", group, "--yes", "--no-wait"])
-        console.say("deletion started in the background (takes 2-5 minutes); billing stops when it completes")
-        return
-
-    listing = runner.run(
-        ["az", "resource", "list", "-g", group, "--tag", f"project={PROJECT_TAG}", "--query", "[].id", "-o", "tsv"],
-        mutating=False, capture=True,
-    )
-    plan = teardown_plan(listing.output.split(), keep_registry=config.get("AZURE_ACR_NAME"))
-    if config.get("AZURE_ACR_NAME"):
-        console.say(f"keeping registry '{config['AZURE_ACR_NAME']}' -- AZURE_ACR_NAME is set, so it may be shared")
-    if not plan:
-        console.say(f"nothing tagged project={PROJECT_TAG} in '{group}' -- nothing to delete")
-        return
-    console.say(f"resources of this project in '{group}' (deleted in this order):")
-    for resource_id in plan:
-        console.say(f"  - {resource_id.split('/providers/', 1)[-1]}")
-    confirm(args, f"Delete these {len(plan)} resources? Everything else in '{group}' is left alone.")
-    for resource_id in plan:
-        runner.run(["az", "resource", "delete", "--ids", resource_id])
-    console.say("done -- note: Log Analytics workspaces stay soft-deleted (recoverable) for 14 days")
-
-
 COMMANDS = {
     "local": cmd_local,
-    "azure": cmd_azure,
     "status": cmd_status,
     "down": cmd_down,
-    "teardown": cmd_teardown,
 }
 
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="deploy.py",
-        description="Rebuild and deploy the Hackathon 2 service in one pass.",
+        description="Rebuild and redeploy the Hackathon 2 service locally, in one pass.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__.split("\n\n", 2)[1] if __doc__ else None,
     )
@@ -787,12 +549,9 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--skip-tests", action="store_true", help="do not run pytest before building")
     parser.add_argument("--no-cache", action="store_true", help="rebuild every layer and re-pull base images")
     parser.add_argument("--dry-run", action="store_true", help="print mutating commands instead of running them")
-    parser.add_argument("-y", "--yes", action="store_true", help="skip confirmation prompts (CI)")
-    parser.add_argument("--timeout", type=int, help="seconds to wait for health (default: 180 local, 420 azure)")
+    parser.add_argument("-y", "--yes", action="store_true", help="skip confirmation prompts")
+    parser.add_argument("--timeout", type=int, help="seconds to wait for health (default: 180)")
     parser.add_argument("--volumes", action="store_true", help="down: also delete the database volume")
-    parser.add_argument("--azure", action="store_true", help="status: also check the Azure deployment")
-    parser.add_argument("--whole-group", action="store_true",
-                        help="teardown: delete the entire resource group, not just this project's resources")
     return parser.parse_args(argv)
 
 

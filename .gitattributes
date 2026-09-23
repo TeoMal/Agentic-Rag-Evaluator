@@ -7,7 +7,6 @@
 *.py            text eol=lf
 *.yml           text eol=lf
 *.yaml          text eol=lf
-*.bicep         text eol=lf
 .env.example    text eol=lf
 Dockerfile      text eol=lf
 .dockerignore   text eol=lf

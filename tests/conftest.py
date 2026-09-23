@@ -5,7 +5,7 @@ import pytest
 from hackathon2.config import Settings
 
 # Anything a developer's shell could leak into Settings.
-_ISOLATED_PREFIXES = ("AZURE_", "OPENAI_", "POSTGRES_", "APPLICATIONINSIGHTS_", "IMAGE_TAG", "KNOWLEDGE_DIR", "APP_ENV")
+_ISOLATED_PREFIXES = ("AZURE_", "OPENAI_", "POSTGRES_", "IMAGE_TAG", "KNOWLEDGE_DIR", "APP_ENV")
 
 
 @pytest.fixture

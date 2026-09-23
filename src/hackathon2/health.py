@@ -1,8 +1,8 @@
 """Subsystem checks behind GET /health.
 
 Every check reports a state instead of raising: /health is also the liveness
-signal for Docker and Azure, and an optional dependency being down (Postgres
-is absent on Azure by design) must not get the container restarted.
+signal for Docker, and an optional dependency being down (e.g. Postgres when
+the app runs without the db container) must not get the container restarted.
 """
 
 from typing import Literal

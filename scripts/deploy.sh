@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Thin wrapper so `bash scripts/deploy.sh [local|azure|status|down|teardown] [flags]` works
+# Thin wrapper so `bash scripts/deploy.sh [local|status|down] [flags]` works
 # from bash/zsh/Git Bash. All logic lives in scripts/deploy.py -- one implementation for
 # Windows, macOS, Linux and CI. See `scripts/deploy.sh --help`.
 set -e

@@ -16,7 +16,6 @@ def test_health_reports_image_tag_and_subsystems(make_settings):
     assert body["checks"] == {
         "llm": "not_configured",
         "database": "not_configured",
-        "telemetry": "disabled",
         "knowledge_documents": 0,
     }
 

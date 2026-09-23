@@ -52,48 +52,9 @@ def test_image_tag_is_unique_per_rebuild_of_uncommitted_code():
 
 
 def test_redact_masks_secrets_in_displayed_commands():
-    shown = deploy.redact(["az", "login", "--password", "hunter2", "C:\\Program Files\\x"], {"hunter2"})
+    shown = deploy.redact(["docker", "login", "--password", "hunter2", "C:\\Program Files\\x"], {"hunter2"})
     assert "hunter2" not in shown
-    assert shown == 'az login --password *** "C:\\Program Files\\x"'
-
-
-def test_bicep_parameters_carry_the_key_and_optional_acr_name():
-    cfg = {
-        **deploy.AZURE_DEFAULTS,
-        "AZURE_OPENAI_API_KEY": "k",
-        "AZURE_OPENAI_ENDPOINT": "https://e/",
-        "OPENAI_API_VERSION": "v",
-        "AZURE_OPENAI_DEPLOYMENT_NAME": "d",
-    }
-    params = deploy.bicep_parameters(cfg, deploy_app=True, image_tag="t1")["parameters"]
-    assert params["azureOpenAiApiKey"] == {"value": "k"}
-    assert params["deployApp"] == {"value": True}
-    assert params["imageTag"] == {"value": "t1"}
-    assert "acrName" not in params  # left to the template's uniqueString() default
-    with_acr = deploy.bicep_parameters({**cfg, "AZURE_ACR_NAME": "acrteam1"}, deploy_app=False, image_tag="t1")
-    assert with_acr["parameters"]["acrName"] == {"value": "acrteam1"}
-
-
-def test_read_outputs_flattens_arm_outputs():
-    arm = {"acrLoginServer": {"type": "String", "value": "acr1.azurecr.io"}, "appFqdn": {"type": "String", "value": ""}}
-    assert deploy.read_outputs(arm) == {"acrloginserver": "acr1.azurecr.io", "appfqdn": ""}
-    assert deploy.read_outputs(None) == {}
-
-
-def test_teardown_deletes_dependents_first_and_spares_a_named_registry():
-    rg = "/subscriptions/s/resourceGroups/rg-gtgh-14/providers/"
-    ids = [
-        rg + "Microsoft.ContainerRegistry/registries/acrshared",
-        rg + "Microsoft.OperationalInsights/workspaces/law-hackathon2-app",
-        rg + "Microsoft.App/managedEnvironments/cae-hackathon2-app",
-        rg + "Microsoft.Insights/components/appi-hackathon2-app",
-        rg + "Microsoft.App/containerApps/hackathon2-app",
-    ]
-    plan = deploy.teardown_plan(ids)
-    assert [p.rsplit("/", 1)[-1] for p in plan] == [
-        "hackathon2-app", "cae-hackathon2-app", "appi-hackathon2-app", "law-hackathon2-app", "acrshared",
-    ]
-    assert not any("registries" in p for p in deploy.teardown_plan(ids, keep_registry="ACRSHARED"))
+    assert shown == 'docker login --password *** "C:\\Program Files\\x"'
 
 
 def test_docker_desktop_crash_is_read_from_its_backend_log():

@@ -1,5 +1,8 @@
 # Architecture
 
+Everything runs locally in Docker (app + Postgres/pgvector). The only external service is the
+Azure OpenAI model the agent calls.
+
 ## Request flow (target design, from the handout)
 
 ```
@@ -27,7 +30,7 @@ Risk synthesis -> APPROVE / CONDITIONAL APPROVAL / REJECT + rating (FR12)
 High risk or final approval -> interrupt() for human review (FR13), resumed via checkpointer
         |
         v
-Assessment report  ──>  Application Insights traces  ──>  evaluation suite (FR14)
+Assessment report  ──>  evaluation suite (FR14)
 ```
 
 ## Code ownership (handout section 13)
@@ -38,47 +41,44 @@ Assessment report  ──>  Application Insights traces  ──>  evaluation sui
 | `rag/`, structured outputs | Deep Agent / RAG | FR03, FR04, FR05, FR11 | 60 loaders/splitters, 62 pgvector, 63 agentic RAG, 64 MMR/rerank, 09 structured output |
 | `mcp_server/` | MCP engineer | FR06 | 56 MCP server, 57 MCP client, 59 subagents + MCP tools |
 | `agents/` specialists, `guardrails/` | A2A / Guardrails | FR07, FR09, FR10, FR15 | 45 subagents, 53 HITL guardrails, 55 red-team hardening, 52 PII/limits/fallback |
-| `evaluation/`, `telemetry.py`, pipeline | Evaluation / Azure | FR14, section 11 | 49 LLM-as-judge, 50 eval pipeline, 38 monitoring, this repo's DevOps |
+| `evaluation/`, pipeline | Evaluation engineer | FR14 | 49 LLM-as-judge, 50 eval pipeline, this repo's local pipeline |
 
 ## Technology choices
 
 | Concern | Choice | Why |
 |---|---|---|
-| LLM | Azure OpenAI `AzureChatOpenAI` (`llm.get_chat_model`) | handout requires Azure; course unit 47 / step 9 |
+| LLM | Azure OpenAI `AzureChatOpenAI` (`llm.get_chat_model`) | the course key/endpoint; unit 47 / step 9 |
 | Embeddings | `AzureOpenAIEmbeddings` (`llm.get_embeddings`) | same resource; class used Cohere |
 | Agent runtime | `deepagents` (planning, virtual FS, subagents, skills) | handout: "must be a multi-step Deep Agent" |
-| Agent-to-agent | deepagents subagents via the `task` tool | handout FR07 accepts "A2A **or an equivalent**"; swap in `a2a-sdk` later if wanted |
-| Vector store | pgvector (`langchain-postgres`) locally | course units 43/62; on Azure the index is built in memory at start-up (no managed DB, to keep cost at zero) |
-| HITL state | LangGraph checkpointer: Postgres locally, in-memory on Azure | durable interrupts (unit 19); Azure runs 1 replica so memory is consistent |
+| Agent-to-agent | deepagents subagents via the `task` tool | handout FR07 accepts "A2A **or an equivalent**" |
+| Vector store | pgvector (`langchain-postgres`) in the compose `db` service | course units 43/62 |
+| HITL state | LangGraph Postgres checkpointer (same `db`) | durable interrupts (unit 19) |
 | MCP | `mcp` FastMCP server + `langchain-mcp-adapters` client | units 56/57/59 |
-| API | FastAPI + uvicorn (`--factory`) | unit 31; health endpoint for probes |
-| Observability | `azure-monitor-opentelemetry` -> Application Insights | handout section 11; replaces Langfuse from units 21/22 |
+| API | FastAPI + uvicorn (`--factory`) | unit 31; `/health` for Docker's health check |
+| Tracing | none yet — Langfuse (units 21–22) is the local option if needed | runs entirely on the laptop |
 | Packaging | uv, `uv.lock`, `uv sync --locked` everywhere | reproducible builds; units 32/33 |
 
-## DevOps pipeline
+## Local pipeline
 
 ```
- developer laptop                         GitHub                                    Azure
- ────────────────                         ──────                                    ─────
- uv run scripts/deploy.py                 PR -> ci.yml                              rg (assigned group)
-   preflight (Docker, .env)                 uv sync --locked, ruff, pytest            ├ ACR  acr<unique>
-   uv lock --check + pytest                 docker build (GHA cache)                  ├ Log Analytics
-   docker compose build (tag = git SHA)     run image, /health == SHA                 ├ App Insights  <── OTel from app
-   db up --wait, app force-recreate                                                   ├ Container Apps env
-   /health == this tag  ✓                 merge -> cd.yml                             └ Container App (1 replica)
-                                            ci.yml (reused)                                ▲
- uv run scripts/deploy.py azure  ───────>   deploy.py azure --tag SHA  ──────────────────────┘
-   (same script, locally or in CD)            Bicep infra -> build amd64 -> push -> Bicep app -> /health == SHA
+uv run scripts/deploy.py
+  1 preflight      Docker running (starts Docker Desktop if not), .env complete
+  2 lock + tests   uv lock --check, pytest
+  3 build          docker compose build app      (tag = git SHA, or SHA-dirty-timestamp)
+  4 database       docker compose up --wait db   (pgvector, data kept in a volume)
+  5 app            force-recreate the app container, wait for its HEALTHCHECK
+  6 verify         GET /health must report the tag this run built
 ```
+
+`ci.yml` (on GitHub, currently disabled) runs the same checks on pull requests: locked install,
+ruff, pytest, image build, boot + `/health` tag check.
 
 Design rules the pipeline follows:
 
-1. **One implementation.** `scripts/deploy.py` is used by developers and by `cd.yml` alike.
-2. **The lockfile is the truth.** Every install is `--locked`; a stale `uv.lock` fails CI and the
+1. **The lockfile is the truth.** Every install is `--locked`; a stale `uv.lock` fails CI and the
    image build instead of silently resolving something different.
-3. **Proof, not hope.** Each image carries its tag; every deploy (local, CI smoke test, Azure) waits
-   until `/health` reports that exact tag.
-4. **No secrets in images, logs or command lines.** `.dockerignore` is an allowlist; the API key
-   reaches Azure through a temp ARM parameters file and a Container Apps secret; logs mask it.
-5. **Safe on shared subscriptions.** Contributor-only permissions suffice (no role assignments);
-   every resource is tagged `project=hackathon2` and teardown deletes only those.
+2. **Proof, not hope.** Each image carries its tag; every deploy waits until `/health` reports that
+   exact tag.
+3. **No secrets in images or logs.** `.dockerignore` is an allowlist, so `.env` never enters the
+   build context; the deploy log masks the API key.
+4. **Local-only exposure.** Both ports (8020 app, 5446 db) bind to 127.0.0.1.

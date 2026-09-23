@@ -57,5 +57,4 @@ ARG IMAGE_TAG=dev
 ENV IMAGE_TAG=${IMAGE_TAG}
 
 # --factory: the app is built at startup by create_app(), not at import time.
-# --proxy-headers: Azure Container Apps terminates TLS in front of the container.
-CMD ["uvicorn", "hackathon2.service:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["uvicorn", "hackathon2.service:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]

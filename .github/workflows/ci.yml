@@ -1,5 +1,4 @@
-# Continuous Integration -- runs on every pull request into main, and is called
-# by cd.yml as the gate in front of every deploy (workflow_call).
+# Continuous Integration -- runs on every pull request into main (and on demand).
 #
 #   1. lint + unit tests, installed exactly as uv.lock pins them
 #   2. build the production image and prove it boots: /health must answer with
@@ -9,7 +8,6 @@ name: CI
 on:
   pull_request:
     branches: [main]
-  workflow_call:
   workflow_dispatch:
 
 permissions:

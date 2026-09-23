@@ -1,7 +1,7 @@
 """Runtime settings, read from the environment (and `.env` for local runs).
 
-One place for every knob, so the container, the Azure Container App and a local
-`uv run` all configure the service the same way. Names match the course `.env`
+One place for every knob, so the container and a local `uv run` configure the
+service the same way. Names match the course `.env`
 (AZURE_OPENAI_* / OPENAI_API_VERSION) so existing keys work unchanged.
 """
 
@@ -30,15 +30,12 @@ class Settings(BaseSettings):
     azure_openai_embedding_deployment: str | None = None
 
     # --- Postgres + pgvector (vector store and durable HITL checkpoints) ---
-    # Optional: without a host the app runs on in-memory state (e.g. on Azure).
+    # Optional: without a host the app runs on in-memory state.
     postgres_host: str | None = None
     postgres_port: int = 5432
     postgres_user: str = "hackathon2"
     postgres_password: SecretStr | None = None
     postgres_db: str = "hackathon2"
-
-    # --- Azure Monitor / Application Insights ---
-    applicationinsights_connection_string: str | None = None
 
     # --- RAG corpus (the NFS knowledge pack) ---
     knowledge_dir: Path = Path("knowledge")

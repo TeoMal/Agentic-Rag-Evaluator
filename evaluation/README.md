@@ -15,9 +15,7 @@ evaluation/
 
 Metrics to report (handout section 10): retrieval relevance, groundedness, citation correctness,
 task completion, tool correctness, agent delegation, guardrail compliance, injection resistance,
-decision quality, latency/cost. Emit each run's scores as Application Insights events too
-(`hackathon2.telemetry.tracer`) so they appear next to the traces.
+decision quality, latency/cost.
 
-The suite calls the real model, so it is **not** part of `ci.yml` (no secrets on PRs); run it with
-`uv run python -m evaluation.run` locally, or add a `workflow_dispatch` workflow that has the
-Azure OpenAI secrets.
+The suite calls the real model, so it runs locally, not in `ci.yml`:
+`uv run python -m evaluation.run`.

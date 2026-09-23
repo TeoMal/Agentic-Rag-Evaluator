@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-# Thin wrapper so `.\scripts\deploy.ps1 [local|azure|status|down|teardown] [flags]` works
+# Thin wrapper so `.\scripts\deploy.ps1 [local|status|down] [flags]` works
 # from PowerShell. All logic lives in scripts/deploy.py -- one implementation for
 # Windows, macOS, Linux and CI. See `.\scripts\deploy.ps1 --help`.
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
