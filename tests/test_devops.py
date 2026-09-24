@@ -51,7 +51,8 @@ def test_health_reports_the_image_tag_and_every_subsystem(make_settings, tmp_pat
     assert client.get("/").json() == {"status": "ok"}
     body = client.get("/health").json()
     assert body["image_tag"] == "abc123"
-    assert body["checks"] == {"llm": "not_configured", "database": "not_configured", "knowledge_documents": 2}
+    assert body["checks"] == {"llm": "not_configured", "database": "not_configured", "knowledge_documents": 2,
+                              "tracing": "not_configured"}
 
 
 def test_deploy_script_env_file_and_image_tags():

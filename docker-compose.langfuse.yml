@@ -1,0 +1,186 @@
+# Local Langfuse (v4) -- tracing and evaluation scores for the agent (handout section 11,
+# with Langfuse in place of Azure Monitor). A separate Compose project from the app, so
+# `deploy.py down --volumes` never touches the traces and Langfuse can stay up across redeploys.
+#
+#   uv run scripts/deploy.py langfuse         start it and wait until healthy
+#   uv run scripts/deploy.py langfuse-down    stop it (traces are kept in the volumes)
+#
+#   UI      http://localhost:3020    login: admin@hackathon2.local / hackathon2-langfuse
+#   API     the app sends to it with the project keys below (LANGFUSE_* in .env.example)
+#
+# Adapted from HACKATHON_1/docker-compose-langfuse.yaml: same services and images, plus
+#   - its own project, container names and volumes, so it can coexist with HACKATHON_1's stack;
+#   - only the UI port is published (3020, next to the app's 8020), on 127.0.0.1;
+#   - a real ENCRYPTION_KEY instead of all zeros; passwords without URL-special characters;
+#   - no Grafana (its provisioning files live in HACKATHON_1; Langfuse's own dashboards cover
+#     runs, latency, tokens, cost and scores).
+# Every credential here is a LOCAL DEMO value, like POSTGRES_PASSWORD in docker-compose.yml.
+# Nothing is reachable from outside this machine.
+
+name: hackathon2-langfuse
+
+x-langfuse-env: &langfuse-env
+  DATABASE_URL: "postgresql://langfuse:langfuse-local-pg@postgres:5432/langfuse"
+  NEXTAUTH_URL: "http://localhost:3020"
+  SALT: "hackathon2-langfuse-salt"
+  # 64 hex characters (openssl rand -hex 32).
+  ENCRYPTION_KEY: "eb957c28aef507618745c243139661e3749e0c5b5936fd634bcec5157a493f11"
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: "clickhouse://clickhouse:9000"
+  CLICKHOUSE_URL: "http://clickhouse:8123"
+  CLICKHOUSE_USER: "clickhouse"
+  CLICKHOUSE_PASSWORD: "langfuse-local-ch"
+  CLICKHOUSE_CLUSTER_ENABLED: "false"  # a single ClickHouse container
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_AUTH: "langfuse-local-redis"
+  REDIS_TLS_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: "langfuse"
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: "auto"
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: "minio"
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: "langfuse-local-minio"
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: "http://minio:9000"
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: "events/"
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: "langfuse"
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: "auto"
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: "minio"
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: "langfuse-local-minio"
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: "http://minio:9000"
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: "media/"
+
+x-langfuse-deps: &langfuse-deps
+  postgres:
+    condition: service_healthy
+  clickhouse:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  minio:
+    condition: service_healthy
+
+services:
+  # Transactional data: users, organisations, projects, API keys, settings.
+  postgres:
+    image: postgres:17-alpine
+    container_name: h2-langfuse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse-local-pg
+      POSTGRES_DB: langfuse
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # Traces, observations and scores. Langfuse v4 needs ClickHouse >= 25.12.
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.12
+    container_name: h2-langfuse-clickhouse
+    restart: unless-stopped
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: langfuse-local-ch
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+
+  # Queues and caching.
+  redis:
+    image: redis:7
+    container_name: h2-langfuse-redis
+    restart: unless-stopped
+    command: --requirepass langfuse-local-redis --maxmemory-policy noeviction
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "langfuse-local-redis", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  # S3-compatible blob storage for raw events.
+  minio:
+    # Pinned by digest (Chainguard's free tier publishes only :latest) -- as in HACKATHON_1.
+    image: cgr.dev/chainguard/minio@sha256:2a30e1a6d9e024631e9fed795773c40de5f819db80875f23dc00f7a4ca4f2246
+    container_name: h2-langfuse-minio
+    restart: unless-stopped
+    entrypoint: sh
+    command: ["-c", "mkdir -p /data/langfuse && minio server --address :9000 --console-address :9001 /data"]
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: langfuse-local-minio
+    volumes:
+      - langfuse_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+
+  # Background ingestion.
+  langfuse-worker:
+    image: docker.langfuse.com/langfuse/langfuse-worker:4
+    container_name: h2-langfuse-worker
+    restart: unless-stopped
+    depends_on: *langfuse-deps
+    environment:
+      <<: *langfuse-env
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://langfuse-worker:3030/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # UI + public API (the SDK sends traces and scores here).
+  langfuse-web:
+    image: docker.langfuse.com/langfuse/langfuse:4
+    container_name: h2-langfuse-web
+    restart: unless-stopped
+    depends_on: *langfuse-deps
+    ports:
+      - "127.0.0.1:3020:3000"
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: "hackathon2-langfuse-nextauth"
+      # First start only: the organisation, project, API keys and login below are created, so
+      # nobody has to click through the UI to get keys. The keys match .env.example.
+      LANGFUSE_INIT_ORG_ID: "northstar"
+      LANGFUSE_INIT_ORG_NAME: "Northstar Financial Services"
+      LANGFUSE_INIT_PROJECT_ID: "hackathon2"
+      LANGFUSE_INIT_PROJECT_NAME: "hackathon2 vendor risk agent"
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: "pk-lf-c913b3b9-aea4-4552-88bf-aa217a701aca"
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: "sk-lf-b3b9a04d-64b8-4d5e-a488-3d3f6c00f7b6"
+      LANGFUSE_INIT_USER_EMAIL: "admin@hackathon2.local"
+      LANGFUSE_INIT_USER_NAME: "hackathon2"
+      LANGFUSE_INIT_USER_PASSWORD: "hackathon2-langfuse"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://langfuse-web:3000/api/public/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  langfuse_postgres_data:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_redis_data:
+  langfuse_minio_data:

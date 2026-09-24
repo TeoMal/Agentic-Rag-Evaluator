@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     # --- RAG corpus (the NFS knowledge pack) ---
     knowledge_dir: Path = Path("knowledge")
 
+    # --- Langfuse tracing (observability.py) ---
+    # Optional: without both keys and a host nothing is traced and nothing is sent anywhere.
+    # LANGFUSE_HOST is the local stack (docker-compose.langfuse.yml) or Langfuse Cloud.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_host: str | None = None
+    langfuse_tracing_enabled: bool = True
+
     @property
     def llm_configured(self) -> bool:
         return all(
@@ -69,6 +77,16 @@ class Settings(BaseSettings):
                 self.openai_api_version,
                 self.azure_openai_deployment_name,
             )
+        )
+
+    @property
+    def tracing_configured(self) -> bool:
+        return bool(
+            self.langfuse_tracing_enabled
+            and self.langfuse_public_key
+            and self.langfuse_secret_key
+            and self.langfuse_secret_key.get_secret_value()
+            and self.langfuse_host
         )
 
     @property

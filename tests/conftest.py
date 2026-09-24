@@ -2,10 +2,17 @@ import os
 
 import pytest
 
+from hackathon2 import observability
 from hackathon2.config import Settings
 
 # Anything a developer's shell could leak into Settings.
-_ISOLATED_PREFIXES = ("AZURE_", "OPENAI_", "POSTGRES_", "IMAGE_TAG", "KNOWLEDGE_DIR", "APP_ENV")
+_ISOLATED_PREFIXES = ("AZURE_", "OPENAI_", "POSTGRES_", "IMAGE_TAG", "KNOWLEDGE_DIR", "APP_ENV", "LANGFUSE_")
+
+
+@pytest.fixture(autouse=True)
+def no_tracing(monkeypatch):
+    """Tests never send traces, even when the developer's .env has Langfuse keys."""
+    monkeypatch.setattr(observability, "get_tracer", lambda: observability.Tracer())
 
 
 @pytest.fixture
