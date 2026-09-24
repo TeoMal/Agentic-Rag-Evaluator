@@ -77,7 +77,8 @@ src/hackathon2/        the service (FastAPI, uvicorn --factory)
   mcp_server/          NFS MCP server (tools, resources, prompts) + the agents' stdio client
   rag/                 ingestion + retrieval (vector, hybrid, or keyword-only without embeddings)
   guardrails/          injection scan, tool authorization, the decision gate
-tests/                 pytest: units per package + integration (API, agents <-> MCP <-> RAG)
+tests/                 ~50 essential pytest tests, one file per area: schemas, devops, api, agents,
+                       gate, guardrails, integration (agents <-> MCP <-> RAG, hidden vendor), evaluation
 evaluation/            evaluation suite (FR14) -> results in evaluation-results/
 knowledge/             the NFS knowledge pack PDFs (RAG corpus, baked into the image)
 architecture/          design + course-unit map

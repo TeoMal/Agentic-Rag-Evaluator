@@ -1,4 +1,5 @@
-"""End-to-end wiring of the deep agent with a scripted model: no LLM, no network.
+"""The agents: end-to-end wiring with a scripted model (no LLM, no network), no answers in the
+prompts, and tool failures that never crash a run.
 
 The scripted model replays AI messages in call order. It is shared by the orchestrator and its
 subagents, so the script reads like the real run: plan -> delegate -> specialist searches and
@@ -7,15 +8,21 @@ instrumentation, report collection, gate, human review), not the model's judgeme
 what the evaluation suite measures with the real model.
 """
 
+import re
 from itertools import count
 
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
+from langchain_core.tools import StructuredTool
 
+from hackathon2.agents import prompts
 from hackathon2.agents.config import AgentSettings
+from hackathon2.agents.context import RunContext, instrument_tool
+from hackathon2.agents.orchestrator import FinalDecision
 from hackathon2.agents.runner import AssessmentRunner
+from hackathon2.agents.specialists import SPECIALISTS
 from hackathon2.agents.tools import stub_provider
-from hackathon2.schemas import AssessmentRequest, HumanDecision
+from hackathon2.schemas import AssessmentRequest, HumanDecision, ToolResult
 
 REQUEST = AssessmentRequest(
     vendor_name="Asteria AI Systems",
@@ -106,14 +113,6 @@ class ScriptedModel(GenericFakeChatModel):
         return self
 
 
-class BrokenModel(GenericFakeChatModel):
-    def bind_tools(self, tools, **kwargs):
-        return self
-
-    def _generate(self, *args, **kwargs):
-        raise RuntimeError("model endpoint unreachable")
-
-
 def _script(domains=("security", "procurement")) -> list[AIMessage]:
     ids = count(1)
 
@@ -127,15 +126,27 @@ def _script(domains=("security", "procurement")) -> list[AIMessage]:
     ]
     if "security" in domains:
         script += [
-            call("task", {"subagent_type": "security-risk-agent", "description": "Assess security for Asteria AI "
-                          "Systems (vendor_id asteria-ai-systems), 2000 users, confidential data, 3 years."}),
+            call(
+                "task",
+                {
+                    "subagent_type": "security-risk-agent",
+                    "description": "Assess security for Asteria AI "
+                    "Systems (vendor_id asteria-ai-systems), 2000 users, confidential data, 3 years.",
+                },
+            ),
             call("search_vendor_documents", {"query": "encryption at rest", "vendor_id": "asteria-ai-systems"}),
             call("DomainReport", SECURITY_REPORT),
         ]
     if "procurement" in domains:
         script += [
-            call("task", {"subagent_type": "procurement-finance-agent", "description": "Assess procurement for "
-                          "Asteria AI Systems (vendor_id asteria-ai-systems), 2000 users, 3 years."}),
+            call(
+                "task",
+                {
+                    "subagent_type": "procurement-finance-agent",
+                    "description": "Assess procurement for "
+                    "Asteria AI Systems (vendor_id asteria-ai-systems), 2000 users, 3 years.",
+                },
+            ),
             call("DomainReport", PROCUREMENT_REPORT),
         ]
     script.append(call("FinalDecision", FINAL_DECISION))
@@ -191,7 +202,30 @@ async def test_undelegated_domain_is_reported_missing():
     assert response.assessment.degraded_mode
 
 
-async def test_model_failure_returns_failed_instead_of_raising():
-    response = await _runner(BrokenModel(messages=iter([]))).run(REQUEST)
-    assert response.status == "failed"
-    assert "model endpoint unreachable" in response.error
+def test_instructions_contain_no_vendor_names_or_corpus_answers():
+    # Handout section 6: do not hard-code expected answers -- a hidden vendor is assessed on the day.
+    texts = [
+        prompts.orchestrator_prompt("   - specialist", prompts.PHASE2_NONE),
+        str(FinalDecision.model_json_schema()),
+    ]
+    for domain, s in SPECIALISTS.items():
+        texts += [
+            prompts.specialist_prompt(title=s.title, domain=domain, prefix=s.control_prefix, focus=s.focus),
+            s.description,
+        ]
+    hints = [r"asteria", r"corvid", r"vendor-[xy]", r"\b\d+\s*(hours?|days?)\b", r"soc ?2", r"enterprise plus"]
+    leaks = [h for h in hints for text in texts if re.search(h, text, re.IGNORECASE)]
+    assert not leaks
+
+
+async def test_tool_failures_are_contained():
+    def search_policy(query: str) -> str:
+        raise ConnectionError("MCP server went away")
+
+    ctx = RunContext(request=REQUEST)
+    tool = instrument_tool(StructuredTool.from_function(search_policy, description="search"), ctx)
+    assert ToolResult.model_validate_json(await tool.ainvoke({"query": "x"})).status == "unavailable"
+    assert ctx.degraded  # an unavailable source degrades the run (FR14) ...
+    calm = RunContext(request=REQUEST)
+    calm.record_tool_result("calculate_tco", ToolResult.fail("error", "no verified pricing -- use explicit mode"))
+    assert calm.tool_failures and not calm.degraded  # ... an invalid call does not

@@ -32,7 +32,7 @@ uv run python -m evaluation.live [--request hidden.json]  # one LIVE run, record
 uv run python -m evaluation.run retrieval --retriever evaluation.retrievers:rag      # the RAG as MCP uses it
 uv run python -m evaluation.run retrieval --retriever evaluation.retrievers:keyword  # BM25 baseline, offline
 uv run python -m evaluation.run assessment               # the 6 run-level metrics (no LLM)
-uv run pytest tests/evaluation                           # tests of this code, no LLM
+uv run pytest tests/test_evaluation.py                   # tests of this code, no LLM
 ```
 
 Exit code `0` = gates passed, `1` = a gate failed, `2` = could not run. Gates (starting points):

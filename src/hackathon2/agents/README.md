@@ -55,8 +55,8 @@ citation cannot be lost or softened during synthesis.
 The handout forbids hard-coding expected answers, and a hidden vendor is assessed on the day. So:
 
 - Prompts state general assessment principles only: no vendor names, no figures, phrases or examples from the
-  knowledge pack. `tests/test_agents_no_leaks.py` fails if one appears in a system prompt, a subagent
-  description, the FinalDecision schema or a tool description, or if agent code names a vendor.
+  knowledge pack. `tests/test_agents.py` fails if a vendor name or corpus phrase appears in a system prompt,
+  a subagent description or the FinalDecision schema.
 - Decision rules, the rating scale and precedents are retrieved at run time and cited in `decision_basis`, so
   the recommendation is traceable (PR-001 section 6).
 - No tool gives budget figures: a number picked by us would decide the budget finding in advance.

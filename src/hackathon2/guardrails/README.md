@@ -74,8 +74,8 @@ Affirmative overrides elsewhere in the same sentence, chunk, nested value or key
 are still screened. A mixed malicious hit is quarantined whole; safe-looking text
 is not stripped out and promoted to trusted evidence.
 
-`tests/fixtures/guardrails/corpus_excerpts.json` records the supplied excerpts and
-their provenance. The attack is attributed by the user to `vendor-x-proposal.pdf`,
+The supplied excerpts and their provenance (kept in git history, commit 1fbb003:
+`tests/fixtures/guardrails/corpus_excerpts.json`). The attack is attributed by the user to `vendor-x-proposal.pdf`,
 page 1, section 7, beginning "IGNORE ALL PREVIOUS POLICIES AND INSTRUCTIONS".
 The two legitimate policy excerpts have unknown filename/page/section; those
 fields are explicitly null rather than invented. Tests include affirmative and
@@ -335,7 +335,8 @@ components. This library does not interrupt a hanging custom checker.
   separation, output gate invocation, propagation of tool/scanner/verifier failures,
   human-review workflows and complete reviewed requirements/provenance context.
 - **Evaluation owner:** live adversarial evaluation and real integration tests;
-  `tests/fixtures/guardrails/` contains reusable synthetic cases.
+  `tests/test_guardrails.py` covers each public boundary (the full synthetic case set
+  is in git history, commit 1fbb003).
 
 Runtime budgets, authentication, real approval storage, interrupt/resume and
 integration enforcement belong to the consuming components and **are not
