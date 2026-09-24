@@ -18,8 +18,11 @@ SECRET = "x" * 64
 
 @pytest.fixture(autouse=True)
 def server_env(monkeypatch, tmp_path):
-    """The subprocess inherits this environment: keyword retrieval, a temp register, a signing key."""
-    monkeypatch.setenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "")
+    """The subprocess inherits this environment: keyword retrieval, a temp register, a signing key.
+    (Empty values override .env, so a developer's embedding resource or database is never used.)"""
+    for name in ("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "AZURE_EMBEDDING_ENDPOINT", "AZURE_EMBEDDING_API_KEY"):
+        monkeypatch.setenv(name, "")
+    monkeypatch.setenv("POSTGRES_HOST", "")
     monkeypatch.setenv("KNOWLEDGE_DIR", str(KNOWLEDGE))
     monkeypatch.setenv("MCP_STATE_DIR", str(tmp_path))
     monkeypatch.setenv("MCP_APPROVAL_SECRET", SECRET)

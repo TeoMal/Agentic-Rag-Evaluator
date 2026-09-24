@@ -31,15 +31,17 @@ def get_chat_model(settings: Settings | None = None, **kwargs) -> AzureChatOpenA
 
 def get_embeddings(settings: Settings | None = None, **kwargs) -> AzureOpenAIEmbeddings:
     settings = settings or get_settings()
-    if not (settings.llm_configured and settings.azure_openai_embedding_deployment):
+    target = settings.embedding_target
+    if target is None:
         raise LLMNotConfiguredError(
             "Azure OpenAI embeddings are not configured: set AZURE_OPENAI_EMBEDDING_DEPLOYMENT "
-            "(an embedding model deployment, e.g. text-embedding-3-small) plus the chat settings."
+            "(an embedding model deployment, e.g. text-embedding-3-small) and either the chat settings or "
+            "AZURE_EMBEDDING_ENDPOINT + AZURE_EMBEDDING_API_KEY for a separate resource."
         )
     return AzureOpenAIEmbeddings(
-        azure_deployment=settings.azure_openai_embedding_deployment,
-        azure_endpoint=settings.azure_openai_endpoint,
-        api_version=settings.openai_api_version,
-        api_key=settings.azure_openai_api_key,
+        azure_deployment=target.deployment,
+        azure_endpoint=target.endpoint,
+        api_version=target.api_version,
+        api_key=target.api_key,
         **kwargs,
     )

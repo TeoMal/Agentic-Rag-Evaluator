@@ -1,0 +1,181 @@
+{
+  "suite": "retrieval",
+  "created_at": "2026-09-24T11:24:27+00:00",
+  "git_commit": "cf65d8421ebc",
+  "passed": true,
+  "gates": [
+    {
+      "metric": "hit_rate",
+      "value": 1.0,
+      "op": ">=",
+      "threshold": 0.8,
+      "passed": true
+    },
+    {
+      "metric": "recall",
+      "value": 0.8333333333333334,
+      "op": ">=",
+      "threshold": 0.6,
+      "passed": true
+    },
+    {
+      "metric": "mrr",
+      "value": 0.9375,
+      "op": ">=",
+      "threshold": 0.5,
+      "passed": true
+    },
+    {
+      "metric": "ndcg",
+      "value": 0.8721922002723261,
+      "op": ">=",
+      "threshold": 0.5,
+      "passed": true
+    },
+    {
+      "metric": "failed_queries",
+      "value": 0,
+      "op": "<=",
+      "threshold": 0,
+      "passed": true
+    }
+  ],
+  "aggregate": {
+    "queries": 8,
+    "failed_queries": 0,
+    "hit_rate": 1.0,
+    "recall": 0.8333333333333334,
+    "mrr": 0.9375,
+    "ndcg": 0.8721922002723261
+  },
+  "cases": [
+    {
+      "id": "RET-01",
+      "domain": "security",
+      "status": "ok",
+      "retrieved": [
+        "information-security-policy#s3#c1",
+        "data-classification-policy#s3#c1",
+        "vendor-x-security-questionnaire#sB#c1",
+        "vendor-x-proposal#s2#c1",
+        "information-security-policy#s8#c1"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "mrr": 1.0,
+      "ndcg": 1.0
+    },
+    {
+      "id": "RET-02",
+      "domain": "security",
+      "status": "ok",
+      "retrieved": [
+        "vendor-x-security-questionnaire#sG#c1",
+        "vendor-x-security-questionnaire#sH#c1",
+        "vendor-gamma-assessment#p1#c1",
+        "vendor-x-proposal#s8#c1",
+        "vendor-x-proposal#s2#c1"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "mrr": 1.0,
+      "ndcg": 1.0
+    },
+    {
+      "id": "RET-03",
+      "domain": "data",
+      "status": "ok",
+      "retrieved": [
+        "data-classification-policy#s5#c1",
+        "vendor-x-proposal#s1#c1",
+        "information-security-policy#s6#c1",
+        "procurement-policy#s4#c1",
+        "data-classification-policy#s4#c1"
+      ],
+      "hit": 1.0,
+      "recall": 0.6666666666666666,
+      "mrr": 1.0,
+      "ndcg": 0.9049495058460971
+    },
+    {
+      "id": "RET-04",
+      "domain": "procurement",
+      "status": "ok",
+      "retrieved": [
+        "procurement-policy#s2.3#c1",
+        "procurement-policy#s2.2#c1",
+        "procurement-policy#s5#c1",
+        "procurement-policy#s2.1#c1",
+        "vendor-x-pricing#s7#c1"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "mrr": 1.0,
+      "ndcg": 0.9680147827042069
+    },
+    {
+      "id": "RET-05",
+      "domain": "procurement",
+      "status": "ok",
+      "retrieved": [
+        "vendor-x-pricing#s1#c1",
+        "vendor-x-pricing#p1#c1",
+        "vendor-x-proposal#s1#c1",
+        "vendor-x-pricing#s5#c1",
+        "vendor-x-security-questionnaire#sH#c1"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "mrr": 1.0,
+      "ndcg": 1.0
+    },
+    {
+      "id": "RET-06",
+      "domain": "legal",
+      "status": "ok",
+      "retrieved": [
+        "information-security-policy#s7#c1",
+        "vendor-x-security-questionnaire#sF#c1",
+        "vendor-x-security-questionnaire#sH#c1",
+        "vendor-risk-policy#s6#c1",
+        "vendor-x-proposal#s8#c1"
+      ],
+      "hit": 1.0,
+      "recall": 1.0,
+      "mrr": 1.0,
+      "ndcg": 1.0
+    },
+    {
+      "id": "RET-07",
+      "domain": "ai_governance",
+      "status": "ok",
+      "retrieved": [
+        "vendor-x-proposal#s3#c1",
+        "ai-governance-policy#p1#c1",
+        "vendor-x-security-questionnaire#p1#c1",
+        "vendor-beta-assessment#p1#c1",
+        "vendor-x-proposal#p1#c1"
+      ],
+      "hit": 1.0,
+      "recall": 0.5,
+      "mrr": 1.0,
+      "ndcg": 0.5982318540006005
+    },
+    {
+      "id": "RET-08",
+      "domain": "decision",
+      "status": "ok",
+      "retrieved": [
+        "procurement-policy#s3#c1",
+        "vendor-risk-policy#s4#c1",
+        "vendor-gamma-assessment#p1#c1",
+        "vendor-risk-policy#s3#c1",
+        "procurement-policy#s6#c1"
+      ],
+      "hit": 1.0,
+      "recall": 0.5,
+      "mrr": 0.5,
+      "ndcg": 0.5063414596277047
+    }
+  ]
+}

@@ -3,9 +3,10 @@
 The rest of the RAG package depends only on langchain_core's `Embeddings` interface
 (`embed_documents` for chunks, `embed_query` for questions), which is also what the
 vector store expects. The provider is chosen here and nowhere else: today Azure
-OpenAI, built by hackathon2.llm.get_embeddings from Settings, i.e. from the
-environment / .env (AZURE_OPENAI_EMBEDDING_DEPLOYMENT plus the AZURE_OPENAI_* and
-OPENAI_API_VERSION settings). No credentials live in code.
+OpenAI, built by hackathon2.llm.get_embeddings from Settings.embedding_target, i.e. from the
+environment / .env (AZURE_OPENAI_EMBEDDING_DEPLOYMENT plus the chat resource's AZURE_OPENAI_*
+settings, or AZURE_EMBEDDING_ENDPOINT / AZURE_EMBEDDING_API_KEY for a separate resource). No
+credentials live in code.
 
 Indexing and querying must use the same model, otherwise query and chunk vectors are
 not comparable -- so both pipelines get their embedder from get_embedder().
@@ -26,7 +27,7 @@ EmbeddingsNotConfiguredError = LLMNotConfiguredError
 def embeddings_configured(settings: Settings | None = None) -> bool:
     """Whether get_embedder() can build an embedder (without building one)."""
     settings = settings or get_settings()
-    return bool(settings.llm_configured and settings.azure_openai_embedding_deployment)
+    return settings.embedding_target is not None
 
 
 def get_embedder(settings: Settings | None = None) -> Embeddings:

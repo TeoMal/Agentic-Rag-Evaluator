@@ -18,3 +18,6 @@ wheels/
 
 # Per-run deploy logs written by scripts/deploy.py
 logs/
+
+# MCP register of recorded assessments when MCP_STATE_DIR=./state (local runs)
+state/

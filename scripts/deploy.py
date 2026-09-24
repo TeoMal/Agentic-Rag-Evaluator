@@ -50,11 +50,11 @@ APP_SERVICE = "app"
 DB_SERVICE = "db"
 COMPOSE = ["docker", "compose", "--project-directory", str(ROOT), "-f", str(ROOT / "docker-compose.yml")]
 
-# The only values with no shared default -- everything else ships in .env.example.
+# The only values with no shared default -- everything else ships in .env.example
+# (OPENAI_API_VERSION has a default in config.py).
 REQUIRED_LLM_KEYS = (
     "AZURE_OPENAI_API_KEY",
     "AZURE_OPENAI_ENDPOINT",
-    "OPENAI_API_VERSION",
     "AZURE_OPENAI_DEPLOYMENT_NAME",
 )
 SECRET_KEYS = {"AZURE_OPENAI_API_KEY", "POSTGRES_PASSWORD", "MCP_APPROVAL_SECRET"}
