@@ -206,9 +206,9 @@ def calculate_tco(
         discount_pct=discount_pct,
         source_chunk_id=source_chunk_id,
     )
-    if result is None:
+    if result is None:  # a usage error, not an outage: the explicit mode works for any vendor
         return ToolResult.fail(
-            "unavailable",
+            "error",
             f"no verified pricing for '{vendor_id}' -- find its prices with search_vendor_documents "
             "and call again with per_user_monthly (and fees) plus source_chunk_id",
         ).model_dump()

@@ -185,7 +185,9 @@ async def test_undelegated_domain_is_reported_missing():
     runner = _runner(ScriptedModel(messages=iter(_script(domains=("security",)))))
     response = await runner.run(REQUEST)
     procurement = next(d for d in response.assessment.domains if d.domain == "procurement")
-    assert [f.status for f in procurement.findings] == ["MISSING"]
+    assert procurement.findings[0].control_id.endswith("-00")  # "domain assessment not completed"
+    assert {f.status for f in procurement.findings} == {"MISSING"}  # + each mandatory control, added by the gate
+    assert len(procurement.findings) > 1
     assert response.assessment.degraded_mode
 
 

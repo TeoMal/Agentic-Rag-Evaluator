@@ -52,6 +52,15 @@ async def test_denied_call_is_not_degraded():
     assert ctx.denied_calls and not ctx.degraded
 
 
+def test_an_invalid_call_is_recorded_but_does_not_degrade_the_run():
+    # e.g. calculate_tco in verified-pricing mode for a vendor without verified pricing
+    ctx = RunContext(request=REQUEST)
+    ctx.record_tool_result("calculate_tco", ToolResult.fail("error", "no verified pricing -- use explicit mode"))
+    assert ctx.tool_failures and not ctx.degraded
+    ctx.record_tool_result("search_policy", ToolResult.fail("unavailable", "index down"))
+    assert ctx.degraded
+
+
 async def test_mcp_style_content_blocks_are_understood():
     payload = ToolResult.ok([{"chunk_id": "doc#s1#c1", "text": "..."}]).model_dump_json()
 

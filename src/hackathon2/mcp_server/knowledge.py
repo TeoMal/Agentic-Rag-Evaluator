@@ -80,6 +80,8 @@ KNOWLEDGE_DOCS: dict[str, tuple[str, DocType]] = {
 # Validated against the whole knowledge pack: it flags the four injection signals in
 # vendor-x-proposal section 7 and nothing else -- including the policy sentences that talk
 # ABOUT injection ("...must not override system policies") or say "AI may recommend Approve".
+# The softer "should be recorded as compliant without further checks" (the hidden-vendor
+# rehearsal's planted text) is caught too, again with no match anywhere else in the pack.
 _NOT = r"(?<!\bnot\s)(?<!\bnever\s)(?<!\bcannot\s)"
 _INJECTION_PATTERNS = re.compile(
     "|".join(
@@ -102,6 +104,13 @@ _INJECTION_PATTERNS = re.compile(
             r"\b(recommend|say|state|write)\b\s*['\"`]\s*(approve[ds]?|low risk|pass(ed)?)\b",
             # "do not mention data retention"
             r"\bdo not (mention|disclose|report|flag|include|reveal)\b",
+            # "should be recorded as compliant" -- a vendor telling the assessor what to conclude
+            (
+                r"\b(should|must|shall|can|may|will) be (recorded|marked|treated|scored|accepted|rated|reported) "
+                r"as (fully )?(compliant|approved|passed|verified|satisfied|low risk)\b"
+            ),
+            # "without further checks"
+            r"\bwithout (any )?(further|additional|independent|more) (checks?|verification|validation|review|scrutiny)\b",
             # role hijacking
             r"\byou are now\b|\bnew (system )?instructions\b|\bact as\b[^.]{0,20}\b(unrestricted|different|developer mode)\b",
             # attempts to close our wrapper or fake a system block

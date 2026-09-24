@@ -10,8 +10,10 @@
    - a quote that matches the chunk only up to whitespace (PDF line breaks) becomes the chunk's exact
      text; a quote that is not in the chunk at all removes the citation;
    - a SUPPORTED / CONTRADICTED / NON_COMPLIANT finding left without citations becomes INFERRED;
-   - a second finding for the same control is dropped.
-   The recommendation, ratings and claims are never changed: that is not code's call.
+   - a second finding for the same control is dropped;
+   - a mandatory control the specialist reported nothing on is added as a MISSING finding, severity
+     high (schemas rule 2: missing evidence is a status, never an absence -- and never a pass).
+   The recommendation, ratings and the agents' own claims are never changed: that is not code's call.
 2. hackathon2.guardrails.gate_assessment decides, from the run's provenance (retrieved chunks, the
    mandatory controls, every tool status):
    allow           no human review needed (e.g. an evidenced low-risk REJECT)
@@ -42,6 +44,9 @@ from hackathon2.schemas import (
 GATE_LIMITS = Limits(max_text_chars=65_536, max_payload_chars=2_000_000, max_hits=1_000)
 
 MAX_QUOTE = 500  # schemas.Evidence.quote
+
+# The note for controls added as MISSING; evaluation/checks.py reads it to count skipped controls.
+SKIPPED_NOTE = "{ids}: no finding from the {domain} specialist -> MISSING (added by the gate)."
 
 _WHY: dict[Reason, str] = {
     Reason.FINAL_APPROVAL: "an APPROVE / CONDITIONAL_APPROVAL recommendation always needs a human decision",
@@ -89,6 +94,7 @@ def apply_gate(draft: AssessmentDraft, request: AssessmentRequest, evidence: Run
     domains = [_repair_report(report, evidence.hits, notes, filled) for report in draft.domains]
     if filled:
         notes.append(f"{len(filled)} citation(s) completed with page/section from the retrieved chunk.")
+    domains = [_add_skipped_controls(report, evidence.required_controls, notes) for report in domains]
     repaired = draft.model_copy(update={"domains": domains})
     assessment = Assessment.from_draft(repaired, request)
     assessment.degraded_mode = evidence.degraded
@@ -134,6 +140,30 @@ def _repair_report(
         seen.add(finding.control_id)
         findings.append(_repair_finding(finding, hits, notes, filled))
     return report.model_copy(update={"findings": findings})
+
+
+def _add_skipped_controls(
+    report: DomainReport, controls: Sequence[RequirementControl], notes: list[str]
+) -> DomainReport:
+    reported = {f.control_id for f in report.findings}
+    skipped = [c for c in controls if c.mandatory and c.domain == report.domain and c.id not in reported]
+    if not skipped:
+        return report
+    added = [
+        Finding(
+            domain=report.domain,
+            control_id=c.id,
+            title=c.control[:150],
+            status="MISSING",
+            severity="high",
+            claim="No finding was reported for this mandatory control, so no evidence was assessed. "
+            "It is recorded as UNKNOWN, not as passed.",
+            remediation="Assess this control (re-run or manual review) before approval.",
+        )
+        for c in skipped
+    ]
+    notes.append(SKIPPED_NOTE.format(ids=", ".join(c.id for c in skipped), domain=report.domain))
+    return report.model_copy(update={"findings": [*report.findings, *added]})
 
 
 def _repair_finding(finding: Finding, hits: Mapping[str, SearchHit], notes: list[str], filled: list[str]) -> Finding:

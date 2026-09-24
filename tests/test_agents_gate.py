@@ -151,6 +151,23 @@ def test_invented_quote_removes_the_citation():
     assert any("quote is not in that chunk" in n for n in result.assessment.gate_notes)
 
 
+def test_a_skipped_mandatory_control_becomes_a_missing_finding():
+    other = RequirementControl(id="SEC-02", domain="security", control="MFA", source_chunk_id=POLICY.chunk_id)
+    legal = RequirementControl(id="LEG-01", domain="legal", control="DPA", source_chunk_id=POLICY.chunk_id)
+    evidence = _evidence()
+    evidence = RunEvidence(**{**vars(evidence), "required_controls": (CONTROL, other, legal)})
+    result = apply_gate(_draft(_finding()), REQUEST, evidence)  # the specialist reported SEC-01 only
+    findings = {f.control_id: f for f in result.assessment.findings}
+    assert findings["SEC-01"].status == "NON_COMPLIANT"  # the agent's own finding is untouched
+    assert (findings["SEC-02"].status, findings["SEC-02"].severity) == ("MISSING", "high")
+    assert "LEG-01" not in findings  # only domains that were assessed are filled in
+    assert (
+        "SEC-02: no finding from the security specialist -> MISSING (added by the gate)."
+        in result.assessment.gate_notes
+    )
+    assert result.decision.outcome == "require_review"
+
+
 def test_second_finding_for_the_same_control_is_dropped():
     result = apply_gate(_draft(_finding(), _finding(status="MISSING", citations=[])), REQUEST, _evidence())
     assert len(result.assessment.findings) == 1
