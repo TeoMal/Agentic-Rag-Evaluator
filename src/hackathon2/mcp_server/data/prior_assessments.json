@@ -1,0 +1,35 @@
+{
+  "_status": "NFS's historical vendor assessments, transcribed from knowledge/historical-vendor-assessments/*.pdf. Cite them via source_document.",
+  "assessments": [
+    {"assessment_id": "hist-vendor-alpha", "vendor_id": "vendor-alpha", "vendor_name": "Vendor Alpha",
+     "category": "cloud-analytics", "year": 2025,
+     "risk_rating": "medium", "recommendation": "CONDITIONAL_APPROVAL",
+     "key_findings": [
+       "Security controls were satisfactory.",
+       "The initial incident-notification commitment was 72 hours; contract negotiation reduced it to 24 hours.",
+       "Production use was approved only after the contract amendment."],
+     "conditions": ["Contract amendment reducing incident notification from 72 to 24 hours, before production use"],
+     "lesson_learned": "Contractual remediation can convert some policy gaps into acceptable residual risk when the vendor can meet the mandatory requirement before go-live.",
+     "source_document": "vendor-alpha-assessment"},
+    {"assessment_id": "hist-vendor-beta", "vendor_id": "vendor-beta", "vendor_name": "Vendor Beta",
+     "category": "generative-ai-assistant", "year": 2026,
+     "risk_rating": "high", "recommendation": "REJECT",
+     "key_findings": [
+       "The vendor retained Confidential prompts for 90 days.",
+       "The vendor reserved the right to use customer content to improve models.",
+       "No enterprise opt-out was available."],
+     "conditions": [],
+     "lesson_learned": "Rejected because mandatory AI data-use and retention requirements could not be met.",
+     "source_document": "vendor-beta-assessment"},
+    {"assessment_id": "hist-vendor-gamma", "vendor_id": "vendor-gamma", "vendor_name": "Vendor Gamma",
+     "category": "document-automation", "year": 2026,
+     "risk_rating": "medium", "recommendation": "CONDITIONAL_APPROVAL",
+     "key_findings": [
+       "The vendor met encryption and identity requirements.",
+       "SOC 2 evidence was missing from the assessment package and recorded as UNKNOWN.",
+       "A temporary pilot using Internal data only was allowed while evidence was obtained."],
+     "conditions": ["Pilot restricted to Internal data until SOC 2 evidence is provided"],
+     "lesson_learned": "Missing evidence is UNKNOWN, not PASS. Scope restriction can enable a controlled pilot without approving higher-risk data processing.",
+     "source_document": "vendor-gamma-assessment"}
+  ]
+}
