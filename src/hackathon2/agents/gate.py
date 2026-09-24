@@ -14,9 +14,17 @@
      proves only what NFS requires (FR05); a SUPPORTED / NON_COMPLIANT finding also needs a policy citation,
      because it compares the vendor with a requirement the reader must be able to see;
    - a second finding for the same control is dropped;
+   - a finding for a control id that is not in its domain's checklist is dropped (the checklist is the
+     scope of the assessment; the specialist may not invent controls);
    - a mandatory control the specialist reported nothing on is added as a MISSING finding, severity
      high (schemas rule 2: missing evidence is a status, never an absence -- and never a pass).
-   The recommendation, ratings and the agents' own claims are never changed: that is not code's call.
+   Consistency rules, applied last (VR-006: missing evidence and mandatory failures drive the rating up):
+   - a domain rating below its worst open finding (NON_COMPLIANT / CONTRADICTED / MISSING) is raised to it,
+     and the overall rating is raised to the highest domain rating -- ratings are only ever raised;
+   - in a CONDITIONAL_APPROVAL, every open finding no condition covers gets one, from its remediation.
+   The recommendation and the agents' own claims are never changed: that is not code's call. Every
+   correction is a gate note, and the evaluation counts them (evaluation/run.py: gate_corrections),
+   so what the model did and what the code fixed stay separately visible.
 2. hackathon2.guardrails.gate_assessment decides, from the run's provenance (retrieved chunks, the
    mandatory controls, every tool status):
    allow           no human review needed (e.g. an evidenced low-risk REJECT)
@@ -31,15 +39,18 @@ from dataclasses import dataclass
 from hackathon2.guardrails import Decision, GateContext, Limits, Reason, gate_assessment
 from hackathon2.schemas import (
     CITATION_REQUIRED,
+    SEVERITY_ORDER,
     Assessment,
     AssessmentDraft,
     AssessmentRequest,
+    Condition,
     DomainReport,
     Evidence,
     Finding,
     RequirementControl,
     SearchHit,
     ToolStatus,
+    max_severity,
 )
 
 # The ledger and the assessment are collected by our own code, not taken from a caller, so the
@@ -50,6 +61,14 @@ MAX_QUOTE = 500  # schemas.Evidence.quote
 
 # The note for controls added as MISSING; evaluation/checks.py reads it to count skipped controls.
 SKIPPED_NOTE = "{ids}: no finding from the {domain} specialist -> MISSING (added by the gate)."
+
+# Notes for the consistency corrections; evaluation/run.py counts them (gate_corrections).
+DROPPED_NOTE = "{ids}: not in the {domain} checklist -> finding dropped (added by the gate)."
+RAISED_NOTE = "{scope} risk_rating raised from {old} to {new} -- never below {why} (added by the gate)."
+COVERED_NOTE = "{ids}: open finding without a condition -> condition added from its remediation (added by the gate)."
+
+# Findings that leave a risk open (evaluation/checks.py uses the same set).
+OPEN_STATUSES = frozenset({"NON_COMPLIANT", "CONTRADICTED", "MISSING"})
 
 # Statuses that compare the vendor with an NFS requirement: they need the requirement (a policy citation) as
 # well as the vendor's evidence. CONTRADICTED compares vendor documents with each other, so vendor citations do.
@@ -101,8 +120,11 @@ def apply_gate(draft: AssessmentDraft, request: AssessmentRequest, evidence: Run
     domains = [_repair_report(report, evidence.hits, notes, filled) for report in draft.domains]
     if filled:
         notes.append(f"{len(filled)} citation(s) completed with page/section from the retrieved chunk.")
+    domains = [_drop_unknown_controls(report, evidence.required_controls, notes) for report in domains]
     domains = [_add_skipped_controls(report, evidence.required_controls, notes) for report in domains]
-    repaired = draft.model_copy(update={"domains": domains})
+    domains = [_raise_domain_rating(report, notes) for report in domains]
+    repaired = _raise_overall_rating(draft.model_copy(update={"domains": domains}), notes)
+    repaired = _cover_open_findings(repaired, notes)
     assessment = Assessment.from_draft(repaired, request)
     assessment.degraded_mode = evidence.degraded
 
@@ -171,6 +193,70 @@ def _add_skipped_controls(
     ]
     notes.append(SKIPPED_NOTE.format(ids=", ".join(c.id for c in skipped), domain=report.domain))
     return report.model_copy(update={"findings": [*report.findings, *added]})
+
+
+def _drop_unknown_controls(
+    report: DomainReport, controls: Sequence[RequirementControl], notes: list[str]
+) -> DomainReport:
+    """Keep findings for the domain's checklist controls (and the "-00" not-assessed placeholder).
+    Without a checklist for the domain (the fetch failed), nothing is dropped."""
+    known = {c.id for c in controls if c.domain == report.domain}
+    if not known:
+        return report
+    kept, dropped = [], []
+    for f in report.findings:
+        if f.control_id in known or f.control_id.endswith("-00"):
+            kept.append(f)
+        else:
+            dropped.append(f"{f.control_id} ({f.status})")
+    if not dropped:
+        return report
+    notes.append(DROPPED_NOTE.format(ids=", ".join(dropped), domain=report.domain))
+    return report.model_copy(update={"findings": kept})
+
+
+def _raise_domain_rating(report: DomainReport, notes: list[str]) -> DomainReport:
+    open_severities = [f.severity for f in report.findings if f.status in OPEN_STATUSES]
+    if not open_severities:
+        return report
+    worst = max_severity(open_severities)
+    if SEVERITY_ORDER[report.risk_rating] >= SEVERITY_ORDER[worst]:
+        return report
+    notes.append(
+        RAISED_NOTE.format(scope=report.domain, old=report.risk_rating, new=worst, why="its worst open finding")
+    )
+    return report.model_copy(update={"risk_rating": worst})
+
+
+def _raise_overall_rating(draft: AssessmentDraft, notes: list[str]) -> AssessmentDraft:
+    highest = max_severity([d.risk_rating for d in draft.domains]) if draft.domains else draft.risk_rating
+    if SEVERITY_ORDER[draft.risk_rating] >= SEVERITY_ORDER[highest]:
+        return draft
+    notes.append(RAISED_NOTE.format(scope="overall", old=draft.risk_rating, new=highest, why="a domain rating"))
+    return draft.model_copy(update={"risk_rating": highest})
+
+
+def _cover_open_findings(draft: AssessmentDraft, notes: list[str]) -> AssessmentDraft:
+    """A conditional approval lists what must be closed: every open finding needs a condition."""
+    if draft.recommendation != "CONDITIONAL_APPROVAL":
+        return draft
+    covered = {control_id for condition in draft.conditions for control_id in condition.control_ids}
+    uncovered = [
+        f for d in draft.domains for f in d.findings if f.status in OPEN_STATUSES and f.control_id not in covered
+    ]
+    if not uncovered:
+        return draft
+    added = [
+        Condition(
+            kind="remediation",
+            text=(f.remediation or f"Close {f.control_id} ({f.title}) with evidence before go-live.")[:500],
+            control_ids=[f.control_id],
+            before_go_live=True,
+        )
+        for f in uncovered
+    ]
+    notes.append(COVERED_NOTE.format(ids=", ".join(f.control_id for f in uncovered)))
+    return draft.model_copy(update={"conditions": [*draft.conditions, *added]})
 
 
 def _repair_finding(finding: Finding, hits: Mapping[str, SearchHit], notes: list[str], filled: list[str]) -> Finding:
