@@ -173,3 +173,109 @@ def test_escaped_text_is_not_substituted_for_an_exact_quote(draft, gate_context,
     assert gate_assessment(draft, context=gate_context).outcome == "allow"
     citation.quote = "Costs &lt; 100 &amp; annual."
     assert gate_assessment(draft, context=gate_context).reasons == (Reason.CITATION_MISMATCH,)
+
+
+def _explicit_noncompliance(draft, gate_context):
+    """Synthetic evidence; the tests do not claim semantic grounding by the gate."""
+    result = draft.model_copy(deep=True)
+    finding = result.domains[0].findings[0]
+    hit = next(iter(gate_context.ledger.values())).model_copy(
+        update={"text": "Customer data is not encrypted at rest."}
+    )
+    finding.status = "NON_COMPLIANT"
+    finding.claim = hit.text
+    finding.citations = [hit.to_evidence()]
+    return result, replace(gate_context, ledger={hit.chunk_id: hit})
+
+
+def test_approve_with_explicit_mandatory_noncompliance_is_invalid_not_rewritten(draft, gate_context):
+    draft, context = _explicit_noncompliance(draft, gate_context)
+    draft.recommendation = "APPROVE"
+    before = draft.model_dump()
+    ledger_before = {key: hit.model_dump() for key, hit in context.ledger.items()}
+    result = gate_assessment(draft, context=context)
+    assert result.outcome == "deny"
+    assert Reason.INCONSISTENT_ASSESSMENT in result.reasons
+    assert draft.model_dump() == before and draft.recommendation == "APPROVE"
+    assert {key: hit.model_dump() for key, hit in context.ledger.items()} == ledger_before
+
+
+def test_supported_approval_is_consistent_but_still_requires_review(draft, gate_context):
+    draft.recommendation = "APPROVE"
+    before = draft.model_dump()
+    result = gate_assessment(draft, context=gate_context)
+    assert result.outcome == "require_review"
+    assert result.reasons == (Reason.FINAL_APPROVAL,)
+    assert draft.model_dump() == before
+
+
+@pytest.mark.parametrize("recommendation, expected", [("CONDITIONAL_APPROVAL", "require_review"), ("REJECT", "allow")])
+def test_noncompliance_does_not_imply_blanket_rejection_of_other_recommendations(
+    draft,
+    gate_context,
+    recommendation,
+    expected,
+):
+    draft, context = _explicit_noncompliance(draft, gate_context)
+    draft.recommendation = recommendation
+    result = gate_assessment(draft, context=context)
+    assert result.outcome == expected
+    assert Reason.INCONSISTENT_ASSESSMENT not in result.reasons
+    if recommendation == "CONDITIONAL_APPROVAL":
+        assert Reason.FINAL_APPROVAL in result.reasons
+
+
+@pytest.mark.parametrize("change", [{"mandatory": False}, {"domain": "legal"}, {"id": "SEC-other"}])
+def test_consistency_rule_requires_reviewed_mandatory_domain_and_id_match(draft, gate_context, change):
+    draft, context = _explicit_noncompliance(draft, gate_context)
+    draft.recommendation = "APPROVE"
+    controls = tuple(control.model_copy(update=change) for control in context.required_controls)
+    result = gate_assessment(draft, context=replace(context, required_controls=controls))
+    assert result.outcome == "require_review"
+    assert Reason.INCONSISTENT_ASSESSMENT not in result.reasons
+    assert Reason.FINAL_APPROVAL in result.reasons
+    if change != {"mandatory": False}:
+        assert Reason.EVIDENCE_GAP in result.reasons
+
+
+@pytest.mark.parametrize("domain, control_id", [("legal", "LEGAL-9"), ("procurement", "COST-X")])
+def test_consistency_check_uses_supplied_controls_without_domain_or_id_constants(
+    draft, gate_context, domain, control_id
+):
+    draft, context = _explicit_noncompliance(draft, gate_context)
+    draft.recommendation = "APPROVE"
+    draft.domains[0].domain = domain
+    finding = draft.domains[0].findings[0]
+    finding.domain = domain
+    finding.control_id = control_id
+    controls = tuple(c.model_copy(update={"domain": domain, "id": control_id}) for c in context.required_controls)
+    assert (
+        Reason.INCONSISTENT_ASSESSMENT
+        in gate_assessment(
+            draft,
+            context=replace(context, required_controls=controls),
+        ).reasons
+    )
+
+
+@pytest.mark.parametrize("status", ["MISSING", "INFERRED", "CONTRADICTED"])
+def test_approval_with_uncertain_mandatory_evidence_still_requires_review(draft, gate_context, status):
+    draft.recommendation = "APPROVE"
+    finding = draft.domains[0].findings[0]
+    finding.status = status
+    if status != "CONTRADICTED":
+        finding.citations = []
+    before = draft.model_dump()
+    result = gate_assessment(draft, context=gate_context)
+    assert result.outcome == "require_review"
+    assert {Reason.EVIDENCE_GAP, Reason.FINAL_APPROVAL} <= set(result.reasons)
+    assert Reason.INCONSISTENT_ASSESSMENT not in result.reasons
+    assert draft.model_dump() == before
+
+
+def test_llm_approval_field_cannot_override_assessment_inconsistency(draft, gate_context):
+    draft, context = _explicit_noncompliance(draft, gate_context)
+    draft.recommendation = "APPROVE"
+    assessment = Assessment(**draft.model_dump(), vendor_name="Fixture", vendor_id="fixture", human_approval="approved")
+    result = gate_assessment(assessment, context=context)
+    assert result.outcome == "deny" and Reason.INCONSISTENT_ASSESSMENT in result.reasons

@@ -37,6 +37,9 @@ def gate_assessment(
     grants permission to record it: separately call authorize_tool_call. Both
     approval recommendations always require review, even on an Assessment with
     human_approval='approved'; trusted approval verification is an action boundary.
+    APPROVE with an explicitly NON_COMPLIANT reviewed mandatory control is invalid,
+    not an instruction to change the recommendation to REJECT. Mandatory controls
+    are matched by domain and ID; this does not adjudicate remediability/exceptions.
     """
     if not isinstance(assessment, AssessmentDraft) or not isinstance(limits, Limits):
         return _decision("deny", Reason.INVALID_OUTPUT)
@@ -104,6 +107,7 @@ def gate_assessment(
 
     denied = []
     review = []
+    mandatory_keys = {(control.domain, control.id) for control in controls if control.mandatory}
     if context.scanner_failed:
         denied.append(Reason.SCANNER_FAILURE)
     if context.verifier_failed:
@@ -138,6 +142,8 @@ def gate_assessment(
             if key in seen:
                 denied.append(Reason.INVALID_OUTPUT)
             seen.add(key)
+            if draft.recommendation == "APPROVE" and finding.status == "NON_COMPLIANT" and key in mandatory_keys:
+                denied.append(Reason.INCONSISTENT_ASSESSMENT)
             if finding.severity in ("high", "critical"):
                 review.append(Reason.HIGH_RISK)
             if finding.status in ("MISSING", "INFERRED", "CONTRADICTED"):

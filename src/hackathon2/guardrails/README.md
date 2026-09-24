@@ -58,9 +58,70 @@ and `presentation: str | None`; every non-allow result has `presentation=None`.
 
 An allow decision is local to its boundary. It never authenticates a peer, grants
 permissions, establishes factual truth, or authorizes a different operation.
-The assessment gate always requires review for APPROVE and CONDITIONAL_APPROVAL,
+The assessment gate requires review for otherwise valid APPROVE and CONDITIONAL_APPROVAL,
 even if an Assessment carries `human_approval="approved"`. A field is not proof of
 review. Recording separately requires tool authorization and external verification.
+
+## Policy excerpts and assessment consistency
+
+The override scanner recognizes narrow local prohibitions such as "must not
+override system policies" and "must never override system instructions". It checks
+the bounded prefix immediately before each override-family match, including PDF
+whitespace/line breaks and an optional opening quotation mark. Intervening words
+or punctuation end that prohibition's scope. This is not a filename/vendor whitelist
+or a blanket exemption for sentences containing "not", quoted text, or policy claims.
+Affirmative overrides elsewhere in the same sentence, chunk, nested value or key
+are still screened. A mixed malicious hit is quarantined whole; safe-looking text
+is not stripped out and promoted to trusted evidence.
+
+`tests/fixtures/guardrails/corpus_excerpts.json` records the supplied excerpts and
+their provenance. The attack is attributed by the user to `vendor-x-proposal.pdf`,
+page 1, section 7, beginning "IGNORE ALL PREVIOUS POLICIES AND INSTRUCTIONS".
+The two legitimate policy excerpts have unknown filename/page/section; those
+fields are explicitly null rather than invented. Tests include affirmative and
+mixed variants, punctuation and PDF line breaks, both preparation boundaries,
+mixed-batch evidence-gap propagation and rejection of quarantined citations.
+
+The official corpus PDFs were not located in the repository/knowledge directory,
+Codex attachments, Downloads or Desktop during this update. The fixtures use the
+supplied excerpts, not independently extracted PDF text. These are excerpt-based
+regression tests, **not proof of full PDF ingestion, chunking, semantic grounding
+or end-to-end protection**. No loader, retriever or chunking implementation is added.
+
+The gate now denies an `APPROVE` recommendation containing an explicitly
+`NON_COMPLIANT` finding for a caller-supplied reviewed mandatory control. It matches
+`Finding.domain` and `Finding.control_id` to `RequirementControl.domain` and `id`,
+and checks `mandatory=True`. The stable code is `inconsistent_assessment`.
+This is a validation failure: the recommendation and input objects are not changed
+to REJECT. A fully supported approval remains subject to human review.
+
+This narrow rule does not automatically reject CONDITIONAL_APPROVAL, nonmandatory
+non-compliance or every non-compliant finding. MISSING, INFERRED, CONTRADICTED,
+omitted mandatory findings, high risk and failed dependencies retain their existing
+review/deny handling. Their absence or uncertainty never becomes verified compliance.
+Evidence-backed remediability and authorized exceptions require business-policy
+and workflow context that the shared contracts do not fully express. The consuming
+owners must supply that context and resolve disagreements before finalization;
+the library does not guess an exception, infer semantic compliance, or claim that
+passing this consistency rule establishes overall policy compliance.
+
+## Official handout mapping (partial library support)
+
+This package README uses the official numbering supplied for this update; legacy
+numbering in shared schemas or global documentation is not changed here.
+
+| Requirement | Library contribution and integration boundary |
+|---|---|
+| FR08: guardrails on inputs, retrieved content, tool access and/or outputs | Bounded content/privacy checks, authorization decisions and output validation; callers must invoke/enforce them. |
+| FR09: retrieved-document prompt-injection resistance | Heuristic scanning and whole-hit quarantine, with attributed excerpt regressions; real RAG ingestion/chunking remains external. |
+| FR10: policy non-compliance, contradictions and missing evidence | Mandatory-control consistency and evidence/status checks; semantic grounding and business-policy assessment remain external. |
+| FR12: human review for high-risk/final consequential approval | Review decisions and external-verifier interface; authenticated review, approval storage and workflow enforcement remain external. |
+| FR14: safe handling of tool, retrieval or agent failure | Non-allow safety decisions and caller-supplied failure/evidence-gap propagation; actual fallback, runtime budgets and recovery remain external. |
+
+These isolated library tests do not establish complete coverage of any requirement.
+Assessment validation, human review and authorization of consequential actions
+remain separate boundaries. An allow decision is not a human approval; LLM-supplied
+approval fields cannot authorize recording or bypass external verification.
 
 ## Supplied MCP/A2A content
 

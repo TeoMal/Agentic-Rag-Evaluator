@@ -42,6 +42,7 @@ class Reason(StrEnum):
     APPROVAL_INVALID = "approval_invalid"
     VERIFIER_FAILURE = "verifier_failure"
     INVALID_OUTPUT = "invalid_output"
+    INCONSISTENT_ASSESSMENT = "inconsistent_assessment"
     INVALID_PROVENANCE = "invalid_provenance"
     CITATION_REQUIRED = "citation_required"
     UNKNOWN_CITATION = "unknown_citation"

@@ -19,6 +19,13 @@ _PROHIBITION = re.compile(
     r"(?:ever )?"
     rf"(?:{_EXFIL_VERB}(?:, | (?:or|and) |, (?:or|and) )){{0,4}}$"
 )
+# Suppress only the override-family match immediately governed by a prohibition.
+# Whitespace may include PDF line breaks; punctuation or intervening words end
+# the scope. A later affirmative match is still inspected independently.
+_OVERRIDE_PROHIBITION = re.compile(
+    r"\b(?:(?:must|should|shall|may|can)\s+(?:not|never)|do\s+not|don['’]t|"
+    r"never|mustn['’]t|shouldn['’]t|cannot|can['’]t)\s+(?:ever\s+)?[\"'“‘]?$"
+)
 
 _RULES = (
     (
@@ -121,8 +128,14 @@ def scan_document(text: str, *, limits: Limits = DEFAULT_LIMITS) -> Decision:
         code
         for code, pattern in _RULES
         if any(
-            code != Reason.SECRET_EXFILTRATION
-            or not _PROHIBITION.search(normalized[max(0, match.start() - 160) : match.start()])
+            not (
+                code == Reason.SECRET_EXFILTRATION
+                and _PROHIBITION.search(normalized[max(0, match.start() - 160) : match.start()])
+            )
+            and not (
+                code == Reason.INSTRUCTION_OVERRIDE
+                and _OVERRIDE_PROHIBITION.search(normalized[max(0, match.start() - 160) : match.start()])
+            )
             for match in pattern.finditer(normalized)
         )
     )
