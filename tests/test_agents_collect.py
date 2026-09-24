@@ -4,6 +4,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 
 from hackathon2.agents.collect import collect_domain_reports, missing_domain_report, subagents_called
 from hackathon2.agents.gate_fallback import provisional_gate
+from hackathon2.agents.orchestrator import with_decision_basis
 from hackathon2.agents.report import render_markdown
 from hackathon2.agents.specialists import SUBAGENT_DOMAINS
 from hackathon2.schemas import AssessmentDraft, AssessmentRequest, DomainReport, Evidence, Finding
@@ -31,10 +32,10 @@ def _report(domain: str = "security") -> DomainReport:
                 claim="Data is encrypted at rest with AES-256.",
                 citations=[
                     Evidence(
-                        chunk_id="vendor-x-security-questionnaire#q12#c1",
+                        chunk_id="vendor-x-security-questionnaire#sB#c1",
                         source="vendor-x-security-questionnaire.pdf",
                         doc_type="vendor_claim",
-                        quote="Customer data is encrypted at rest with AES-256",
+                        quote="B2 Encryption at rest: YES, AES-256.",
                     )
                 ],
             ),
@@ -114,5 +115,27 @@ def test_provisional_gate_requires_review_when_degraded():
 def test_markdown_report_names_gaps_and_citations():
     text = render_markdown(provisional_gate(_draft(), REQUEST, set(), degraded=False))
     assert "CONDITIONAL APPROVAL" in text
-    assert "SEC-02" in text.split("## Missing or contradictory evidence")[1].split("##")[0]
-    assert "vendor-x-security-questionnaire#q12#c1" in text
+    gaps = text.split("## Unknown (missing) or contradictory evidence")[1].split("##")[0]
+    assert "**SEC-02** (UNKNOWN, high)" in gaps  # MISSING is shown in NFS vocabulary
+    assert "vendor-x-security-questionnaire#sB#c1" in text
+
+
+def _basis() -> Evidence:
+    return Evidence(
+        chunk_id="vendor-risk-policy#s3#c1",
+        source="vendor-risk-policy.pdf",
+        doc_type="policy",
+        section="VR-006 3. Decision outcomes",
+        quote="REJECT: One or more mandatory controls cannot be met",
+    )
+
+
+def test_decision_basis_is_appended_to_the_summary():
+    text = with_decision_basis("Conditional approval.", [_basis()])
+    assert text.endswith("Decision basis: VR-006 3. Decision outcomes (vendor-risk-policy#s3#c1)")
+
+
+def test_decision_basis_never_breaks_the_summary_length_limit():
+    text = with_decision_basis("x" * 2400, [_basis()] * 40)
+    assert len(text) <= 3000
+    AssessmentDraft(recommendation="REJECT", risk_rating="high", domains=[], executive_summary=text)

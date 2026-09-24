@@ -1,15 +1,16 @@
 """One vendor assessment, end to end (the entry point for the API and the evaluation suite).
 
     runner = AssessmentRunner()
-    response = await runner.run(request)                      # FR01 -> FR12
-    response = await runner.decide(assessment_id, decision)   # FR13, when status == "awaiting_approval"
+    response = await runner.run(request)                      # FR01 -> FR11
+    response = await runner.decide(assessment_id, decision)   # FR12, when status == "awaiting_approval"
 
 Flow of run():
     tools (stub or MCP) -> instrument for this run -> orchestrator deep agent (plans with write_todos,
-    delegates to specialists) -> DomainReports read back from the conversation -> missing domains
-    filled as MISSING -> AssessmentDraft (LLM decision + reports verbatim) -> decision gate -> response.
+    reads the NFS decision rules and precedents, delegates to specialists in two phases) ->
+    DomainReports read back from the conversation -> missing domains filled as MISSING ->
+    AssessmentDraft (LLM decision + reports verbatim + cited decision basis) -> decision gate -> response.
 
-run() never raises for agent, tool or model failures: it returns status "failed" with the error (FR15).
+run() never raises for agent, tool or model failures: it returns status "failed" with the error (FR14).
 Results are kept in memory; persistence is up to the API layer.
 """
 
@@ -25,7 +26,7 @@ from hackathon2.agents.collect import collect_domain_reports, missing_domain_rep
 from hackathon2.agents.config import ALL_DOMAINS, AgentSettings, get_agent_settings
 from hackathon2.agents.context import RunContext, UsageCallback, content_to_text, instrument_tool, parse_tool_result
 from hackathon2.agents.gate_fallback import GateFn, resolve_gate
-from hackathon2.agents.orchestrator import FinalDecision, build_orchestrator, render_request
+from hackathon2.agents.orchestrator import FinalDecision, build_orchestrator, render_request, with_decision_basis
 from hackathon2.agents.specialists import SPECIALISTS, SUBAGENT_DOMAINS
 from hackathon2.agents.tools import ToolsProvider, default_provider
 from hackathon2.llm import get_chat_model
@@ -107,7 +108,7 @@ class AssessmentRunner:
             risk_rating=decision.risk_rating,
             domains=domains,
             conditions=decision.conditions,
-            executive_summary=decision.executive_summary,
+            executive_summary=with_decision_basis(decision.executive_summary, decision.decision_basis),
         )
         degraded = ctx.degraded or len(reports) < len(self.domains)
         assessment = self._gate(draft, request, set(ctx.retrieved_chunk_ids), degraded)
@@ -120,7 +121,7 @@ class AssessmentRunner:
         return self._store(response)
 
     async def decide(self, assessment_id: str, decision: HumanDecision) -> AssessmentResponse:
-        """Apply a human reviewer's decision to an assessment that is awaiting approval (FR13)."""
+        """Apply a human reviewer's decision to an assessment that is awaiting approval (FR12)."""
         current = self._results.get(assessment_id)
         if current is None:
             raise KeyError(assessment_id)

@@ -22,7 +22,7 @@ async def test_retrieved_chunk_ids_are_logged():
     ctx = RunContext(request=REQUEST)
     tools = _instrumented(ctx)
     await tools["search_policy"].ainvoke({"query": "encryption at rest", "domain": "security"})
-    assert "information-security-policy#s3.1#c1" in ctx.retrieved_chunk_ids
+    assert "information-security-policy#s3#c1" in ctx.retrieved_chunk_ids
     assert ctx.tools_called == ["search_policy"]
     assert not ctx.degraded
 

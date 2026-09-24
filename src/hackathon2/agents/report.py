@@ -1,4 +1,7 @@
-"""Concise executive vendor assessment report (handout section 2), rendered as Markdown."""
+"""Concise executive vendor assessment report (handout section 2), rendered as Markdown.
+
+Evidence statuses are shown in NFS vocabulary: MISSING is displayed as UNKNOWN (policy VR-006 section 4).
+"""
 
 from hackathon2.schemas import Assessment, Evidence, Finding
 
@@ -7,6 +10,13 @@ _RECOMMENDATION_LABEL = {
     "CONDITIONAL_APPROVAL": "CONDITIONAL APPROVAL",
     "REJECT": "REJECT",
 }
+
+
+_STATUS_LABEL = {"MISSING": "UNKNOWN"}
+
+
+def _status(status: str) -> str:
+    return _STATUS_LABEL.get(status, status)
 
 
 def _cell(text: str) -> str:
@@ -25,7 +35,8 @@ def _citation(evidence: Evidence) -> str:
 def _finding_row(finding: Finding) -> str:
     citations = "<br>".join(_citation(c) for c in finding.citations) or "none"
     return (
-        f"| {finding.control_id} | {finding.status} | {finding.severity} | {_cell(finding.claim)} | {citations} |"
+        f"| {finding.control_id} | {_status(finding.status)} | {finding.severity} | {_cell(finding.claim)} "
+        f"| {citations} |"
     )
 
 
@@ -45,9 +56,9 @@ def render_markdown(assessment: Assessment) -> str:
     lines += ["", "## Executive summary", "", assessment.executive_summary, ""]
 
     gaps = assessment.evidence_gaps
-    lines += ["## Missing or contradictory evidence", ""]
+    lines += ["## Unknown (missing) or contradictory evidence", ""]
     if gaps:
-        lines += [f"- **{f.control_id}** ({f.status}, {f.severity}): {_cell(f.claim)}" for f in gaps]
+        lines += [f"- **{f.control_id}** ({_status(f.status)}, {f.severity}): {_cell(f.claim)}" for f in gaps]
     else:
         lines.append("- None identified.")
     lines.append("")

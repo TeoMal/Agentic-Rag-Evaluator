@@ -1,4 +1,4 @@
-"""The specialist subagents (FR07, FR08): one per risk domain, reached through the `task` tool.
+"""The specialist subagents (FR07 risk domains; handout section 8): one per domain, reached through `task`.
 
 Each specialist returns a DomainReport through structured output (ToolStrategy), so the orchestrator
 receives validated JSON instead of free text. ToolStrategy is used rather than the provider's native

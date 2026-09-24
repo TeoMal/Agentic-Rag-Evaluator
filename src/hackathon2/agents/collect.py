@@ -3,7 +3,7 @@
 Each `task` call leaves an AIMessage tool call (with the subagent_type) and a ToolMessage (with the
 subagent's DomainReport as JSON). They are paired by tool_call_id, validated, and checked against
 the domain the subagent owns. A domain without a valid report gets a placeholder whose single
-finding is MISSING -- an unassessed domain is never a silent pass (FR11, FR15).
+finding is MISSING (UNKNOWN in NFS policy) -- an unassessed domain is never a silent pass (FR10, FR14).
 """
 
 from collections.abc import Mapping, Sequence
@@ -85,7 +85,7 @@ def missing_domain_report(domain: Domain, reason: str) -> DomainReport:
     return DomainReport(
         domain=domain,
         risk_rating="high",
-        summary=f"This domain was not assessed: {reason}. It is treated as unassessed, not as passed.",
+        summary=f"This domain was not assessed: {reason}. It is recorded as UNKNOWN, not as passed.",
         findings=[
             Finding(
                 domain=domain,

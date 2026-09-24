@@ -23,7 +23,8 @@ ToolsProvider = Callable[[], Awaitable[list[BaseTool]]]
 
 KNOWLEDGE_TOOLS = ("get_policy_requirements", "search_policy", "search_vendor_documents", "retrieve_document")
 
-ORCHESTRATOR_TOOLS = ("get_vendor_history", "retrieve_prior_assessments")
+# The orchestrator reads the decision rules and precedents itself; domain evidence is the specialists' job.
+ORCHESTRATOR_TOOLS = ("search_policy", "retrieve_document", "retrieve_prior_assessments", "get_vendor_history")
 
 SPECIALIST_TOOLS: dict[Domain, tuple[str, ...]] = {
     "security": (*KNOWLEDGE_TOOLS, "get_vendor_history"),

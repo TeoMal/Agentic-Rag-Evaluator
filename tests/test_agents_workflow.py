@@ -27,7 +27,8 @@ REQUEST = AssessmentRequest(
     notes="The platform may process confidential corporate documents.",
 )
 
-Q12 = "vendor-x-security-questionnaire#q12#c1"
+ENCRYPTION = "vendor-x-security-questionnaire#sB#c1"
+DECISION_RULES = "vendor-risk-policy#s3#c1"
 
 SECURITY_REPORT = {
     "domain": "security",
@@ -40,13 +41,13 @@ SECURITY_REPORT = {
             "title": "Encryption",
             "status": "SUPPORTED",
             "severity": "low",
-            "claim": "Data is encrypted at rest with AES-256 and in transit with TLS 1.3.",
+            "claim": "Data is encrypted in transit with TLS 1.2+ and at rest with AES-256.",
             "citations": [
                 {
-                    "chunk_id": Q12,
+                    "chunk_id": ENCRYPTION,
                     "source": "vendor-x-security-questionnaire.pdf",
                     "doc_type": "vendor_claim",
-                    "quote": "Customer data is encrypted at rest with AES-256 and in transit with TLS 1.3.",
+                    "quote": "B1 TLS 1.2+: YES. B2 Encryption at rest: YES, AES-256.",
                 }
             ],
         },
@@ -56,8 +57,8 @@ SECURITY_REPORT = {
             "title": "Certification",
             "status": "MISSING",
             "severity": "high",
-            "claim": "No current SOC 2 Type II report or ISO 27001 certificate was found.",
-            "remediation": "Provide a current SOC 2 Type II report before go-live.",
+            "claim": "The vendor claims ISO 27001 and SOC 2 Type II, but the reports were not supplied.",
+            "remediation": "Obtain the current SOC 2 Type II report and ISO 27001 certificate before go-live.",
         },
     ],
 }
@@ -82,6 +83,16 @@ PROCUREMENT_REPORT = {
 FINAL_DECISION = {
     "recommendation": "CONDITIONAL_APPROVAL",
     "risk_rating": "high",
+    "decision_basis": [
+        {
+            "chunk_id": DECISION_RULES,
+            "source": "vendor-risk-policy.pdf",
+            "doc_type": "policy",
+            "section": "VR-006 3. Decision outcomes",
+            "quote": "CONDITIONAL APPROVAL: No prohibited control failure, but remediation or contractual conditions "
+            "are required before or shortly after go-live.",
+        }
+    ],
     "conditions": [
         {"kind": "remediation", "text": "Provide a current SOC 2 Type II report.", "control_ids": ["SEC-02"]}
     ],
@@ -111,7 +122,10 @@ def _script(domains=("security", "procurement")) -> list[AIMessage]:
         return AIMessage(content="", tool_calls=[{"name": name, "args": args, "id": f"call_{next(ids)}"}])
 
     todos = [{"content": f"Assess the {d} domain", "status": "pending"} for d in domains]
-    script = [call("write_todos", {"todos": [*todos, {"content": "Synthesise the decision", "status": "pending"}]})]
+    script = [
+        call("write_todos", {"todos": [*todos, {"content": "Synthesise the decision", "status": "pending"}]}),
+        call("search_policy", {"query": "decision outcomes approve conditional approval reject"}),
+    ]
     if "security" in domains:
         script += [
             call("task", {"subagent_type": "security-risk-agent", "description": "Assess security for Asteria AI "
@@ -153,7 +167,9 @@ async def test_end_to_end_assessment_with_human_review():
     metrics = response.metrics
     assert metrics.subagents_called == ["security-risk-agent", "procurement-finance-agent"]
     assert "search_vendor_documents" in metrics.tools_called
-    assert Q12 in metrics.retrieved_chunk_ids
+    assert metrics.tools_called[0] == "search_policy"  # the orchestrator reads the decision rules first
+    assert {ENCRYPTION, DECISION_RULES} <= set(metrics.retrieved_chunk_ids)
+    assert "Decision basis: VR-006 3. Decision outcomes" in assessment.executive_summary
 
     final = await runner.decide(assessment.assessment_id, HumanDecision(approved=True, reviewer="cro@northstar"))
     assert final.status == "completed"

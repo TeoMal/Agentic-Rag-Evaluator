@@ -25,7 +25,7 @@ class AgentSettings(BaseSettings):
     mcp_url: str | None = None
     # Upper bound on graph steps for the orchestrator (each subagent run has its own budget).
     recursion_limit: int = 250
-    # 0 keeps runs as repeatable as the model allows (evaluation, FR14). None = model default
+    # 0 keeps runs as repeatable as the model allows (evaluation, FR13). None = model default
     # (needed for reasoning models that reject a temperature).
     temperature: float | None = 0.0
 

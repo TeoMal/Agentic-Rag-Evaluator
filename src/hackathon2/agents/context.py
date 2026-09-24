@@ -3,7 +3,7 @@
 Every tool handed to an agent is wrapped by `instrument_tool`, which:
   - logs the call (RunMetrics.tools_called);
   - records every chunk_id a tool returned -- the decision gate checks citations against this log;
-  - turns an exception inside a tool into a ToolResult "unavailable" instead of crashing the run (FR15);
+  - turns an exception inside a tool into a ToolResult "unavailable" instead of crashing the run (FR14);
   - notes non-ok results, so the assessment can be marked degraded_mode.
 
 The wrapper works the same for the stub tools and for tools loaded from the MCP server.
@@ -121,7 +121,7 @@ def instrument_tool(tool: BaseTool, ctx: RunContext) -> BaseTool:
         ctx.tools_called.append(tool.name)
         try:
             raw = await tool.ainvoke(kwargs)
-        except Exception as exc:  # noqa: BLE001 -- FR15: a failing tool must not crash the assessment
+        except Exception as exc:  # noqa: BLE001 -- FR14: a failing tool must not crash the assessment
             logger.warning("tool %s failed: %s: %s", tool.name, type(exc).__name__, exc)
             result = ToolResult.fail(
                 "unavailable",
