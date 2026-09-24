@@ -9,7 +9,9 @@
      chunk's values (missing values are filled in the same way, counted in one note);
    - a quote that matches the chunk only up to whitespace (PDF line breaks) becomes the chunk's exact
      text; a quote that is not in the chunk at all removes the citation;
-   - a SUPPORTED / CONTRADICTED / NON_COMPLIANT finding left without citations becomes INFERRED;
+   - a SUPPORTED / CONTRADICTED / NON_COMPLIANT finding left without citations becomes INFERRED, and so does
+     one left with no vendor citation: those statuses describe what the vendor does, and an NFS policy
+     proves only what NFS requires (FR05);
    - a second finding for the same control is dropped;
    - a mandatory control the specialist reported nothing on is added as a MISSING finding, severity
      high (schemas rule 2: missing evidence is a status, never an absence -- and never a pass).
@@ -176,6 +178,9 @@ def _repair_finding(finding: Finding, hits: Mapping[str, SearchHit], notes: list
     if finding.status in CITATION_REQUIRED and not citations:
         update["status"] = "INFERRED"
         notes.append(f"{finding.control_id}: {finding.status} without a verifiable citation -> INFERRED.")
+    elif finding.status in CITATION_REQUIRED and not any(c.doc_type == "vendor_claim" for c in citations):
+        update["status"] = "INFERRED"
+        notes.append(f"{finding.control_id}: {finding.status} without a vendor citation -> INFERRED.")
     return finding.model_copy(update=update)
 
 
