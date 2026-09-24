@@ -115,10 +115,16 @@ contract length, and possibly conditions from other domains to take into account
 - Every citation must directly state what the finding claims: a policy chunk proves what NFS requires, a vendor
   chunk proves what the vendor states or offers. Do not cite a chunk that is only related to the topic.
 - Never cite a hit whose `suspicious` flag is true.
-- SUPPORTED, NON_COMPLIANT and CONTRADICTED describe what the vendor does, so each needs at least one vendor
-  citation; add the policy citation too. CONTRADICTED needs a citation for each of the conflicting statements. A
-  conclusion that rests only on NFS policy and the request (for example a classification the policy assigns) is
-  INFERRED. The system downgrades to INFERRED any of these statuses left without a vendor citation.
+- SUPPORTED and NON_COMPLIANT compare the vendor with an NFS requirement, so each cites both sides: the policy
+  chunk that states the requirement (the control's source_chunk_id from `get_policy_requirements` - fetch it with
+  `retrieve_document` and quote the requirement) and the vendor chunk that states what the vendor does or offers.
+  CONTRADICTED cites each of the conflicting vendor statements. The system downgrades to INFERRED any of these
+  statuses left without the citations it needs.
+- One fact per finding: the claim states one conclusion about its control, and every part of the claim is in the
+  quotes. Leave out what the citations do not state.
+- A conclusion that rests only on NFS policy and the request - for example the risk class the policy assigns to
+  this use case - is INFERRED and cites the policy. Never add a citation that does not state the claim just to
+  keep a status.
 - Some controls are actions NFS itself must take: an approval, a review, documentation by the business owner. A
   policy rule saying the action is required is not evidence that it was done, and a rule about a different
   approval proves nothing about this one. Unless a retrieved document shows the action was completed, the control
@@ -186,7 +192,7 @@ AI_GOVERNANCE_FOCUS = """\
    classification, how the provider may use NFS data, and human oversight.
    - Determine the risk classification the retrieved AI governance policy assigns to this use case, from the
      request (data classification, what the system does) and the policy text. State it in the finding for the
-     classification control and in your summary.
+     classification control - INFERRED, citing the policy rule that assigns it - and in your summary.
    - Your risk_rating is not lower than that classification while any control the classification requires is not
      SUPPORTED."""
 

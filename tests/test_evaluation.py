@@ -7,7 +7,7 @@ import pytest
 
 from evaluation import checks
 from evaluation.judge import Judgment
-from evaluation.live import record_run
+from evaluation.live import record_run, summarize
 from evaluation.metrics import Target, citation_problems, quote_in_text, rank_scores
 from evaluation.run import DATASETS, RunRecord, check_gates, evaluate_assessment, evaluate_grounding, load_cases
 from hackathon2.agents.gate import RunEvidence
@@ -120,6 +120,10 @@ def test_code_checks_alone_catch_the_planted_citation_defects():
     agg = evaluate_grounding(SAMPLE, judge=None)["aggregate"]
     assert agg["citation_problems"] == {"misquoted": 1, "fabricated": 1, "source_mismatch": 1}
     assert agg["uncited_material"] == 1 and agg["groundedness"] is None  # not measured without a judge
+    gated = SAMPLE.model_copy(deep=True)  # claims the decision gate downgraded are counted, not hidden
+    gated.response.assessment.gate_notes.append("SEC-06: NON_COMPLIANT without a policy citation -> INFERRED.")
+    report = evaluate_grounding(gated, judge=None)
+    assert report["aggregate"]["downgraded_by_gate"] == 1 and report["downgraded"] == ["SEC-06"]
 
 
 def test_judge_verdicts_feed_the_grounding_scores():
@@ -169,3 +173,5 @@ async def test_a_live_run_is_recorded_with_its_evidence():
     record = await record_run(FakeRunner(), request)
     assert record.retrieved_hits == SAMPLE.retrieved_hits and record.required_controls == ["SEC-07"]
     assert evaluate_assessment(record, SCENARIOS)["aggregate"]["injection_exercised"] > 0
+    summary = summarize([{"groundedness": 0.5, "cost_usd": 0.1}, {"groundedness": 1.0, "cost_usd": 0.2}])
+    assert summary["groundedness"] == {"mean": 0.75, "min": 0.5, "max": 1.0, "n": 2}  # --runs N: gates on the mean

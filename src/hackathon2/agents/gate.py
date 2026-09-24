@@ -11,7 +11,8 @@
      text; a quote that is not in the chunk at all removes the citation;
    - a SUPPORTED / CONTRADICTED / NON_COMPLIANT finding left without citations becomes INFERRED, and so does
      one left with no vendor citation: those statuses describe what the vendor does, and an NFS policy
-     proves only what NFS requires (FR05);
+     proves only what NFS requires (FR05); a SUPPORTED / NON_COMPLIANT finding also needs a policy citation,
+     because it compares the vendor with a requirement the reader must be able to see;
    - a second finding for the same control is dropped;
    - a mandatory control the specialist reported nothing on is added as a MISSING finding, severity
      high (schemas rule 2: missing evidence is a status, never an absence -- and never a pass).
@@ -49,6 +50,10 @@ MAX_QUOTE = 500  # schemas.Evidence.quote
 
 # The note for controls added as MISSING; evaluation/checks.py reads it to count skipped controls.
 SKIPPED_NOTE = "{ids}: no finding from the {domain} specialist -> MISSING (added by the gate)."
+
+# Statuses that compare the vendor with an NFS requirement: they need the requirement (a policy citation) as
+# well as the vendor's evidence. CONTRADICTED compares vendor documents with each other, so vendor citations do.
+COMPARED_WITH_POLICY = frozenset({"SUPPORTED", "NON_COMPLIANT"})
 
 _WHY: dict[Reason, str] = {
     Reason.FINAL_APPROVAL: "an APPROVE / CONDITIONAL_APPROVAL recommendation always needs a human decision",
@@ -181,6 +186,9 @@ def _repair_finding(finding: Finding, hits: Mapping[str, SearchHit], notes: list
     elif finding.status in CITATION_REQUIRED and not any(c.doc_type == "vendor_claim" for c in citations):
         update["status"] = "INFERRED"
         notes.append(f"{finding.control_id}: {finding.status} without a vendor citation -> INFERRED.")
+    elif finding.status in COMPARED_WITH_POLICY and not any(c.doc_type == "policy" for c in citations):
+        update["status"] = "INFERRED"
+        notes.append(f"{finding.control_id}: {finding.status} without a policy citation -> INFERRED.")
     return finding.model_copy(update=update)
 
 

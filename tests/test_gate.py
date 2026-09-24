@@ -103,17 +103,17 @@ def test_unverifiable_citations_are_removed_and_the_claim_downgraded():
     assert "not retrieved in this run" in notes and "prompt injection" in notes and "not in that chunk" in notes
 
 
-def test_a_vendor_status_needs_a_vendor_citation():
-    # FR05: SUPPORTED / NON_COMPLIANT / CONTRADICTED are claims about the vendor; a policy alone cannot prove them.
-    policy_only = [POLICY.to_evidence("Confidential data must be encrypted")]
-    result = apply_gate(_draft(_finding(policy_only)), REQUEST, _evidence())
-    finding = result.assessment.findings[0]
-    assert finding.status == "INFERRED" and [c.chunk_id for c in finding.citations] == [POLICY.chunk_id]
-    assert "SEC-01: NON_COMPLIANT without a vendor citation -> INFERRED." in result.assessment.gate_notes
-    vendor_only = [CLAIM.to_evidence("B1 TLS 1.2+: NO.")]
-    assert apply_gate(_draft(_finding(vendor_only)), REQUEST, _evidence()).assessment.findings[0].status == (
-        "NON_COMPLIANT"
-    )
+def test_a_compliance_verdict_needs_both_the_requirement_and_the_vendor_evidence():
+    # FR05: a policy alone cannot show what the vendor does; vendor evidence alone cannot show it breaks a rule.
+    for citations, missing in (
+        ([POLICY.to_evidence("Confidential data must be encrypted")], "vendor"),
+        ([CLAIM.to_evidence("B1 TLS 1.2+: NO.")], "policy"),
+    ):
+        result = apply_gate(_draft(_finding(citations)), REQUEST, _evidence())
+        finding = result.assessment.findings[0]
+        assert finding.status == "INFERRED" and finding.citations  # the citation itself is kept
+        assert f"SEC-01: NON_COMPLIANT without a {missing} citation -> INFERRED." in result.assessment.gate_notes
+    assert apply_gate(_draft(_finding()), REQUEST, _evidence()).assessment.findings[0].status == "NON_COMPLIANT"
 
 
 def test_quote_and_metadata_are_repaired_from_the_retrieved_chunk():
