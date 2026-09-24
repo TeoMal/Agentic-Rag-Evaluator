@@ -42,8 +42,9 @@ uv run scripts/deploy.py langfuse        # start it (first run pulls ~2 GB) -> h
 uv run scripts/deploy.py                 # the app picks up the LANGFUSE_* keys from .env
 ```
 
-Login `admin@hackathon2.local` / `hackathon2-langfuse` (local demo values; the project and its API keys
-are created on first start and match `.env.example`). Each assessment is **one trace**
+Login `admin@hackathon2.local` / `hackathon2-langfuse` (local demo values). The project's API keys live
+only in `.env`: `deploy.py langfuse` generates them there when blank, and the project is created with them on
+first start (an existing Langfuse volume keeps the keys it was created with). Each assessment is **one trace**
 (`vendor-assessment`):
 
 | §11 asks for | In the trace |
