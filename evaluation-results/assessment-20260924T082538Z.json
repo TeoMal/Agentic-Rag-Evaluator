@@ -1,12 +1,12 @@
 {
   "suite": "assessment",
-  "created_at": "2026-09-24T08:20:01+00:00",
-  "git_commit": "0e0db723e1ff",
+  "created_at": "2026-09-24T08:25:38+00:00",
+  "git_commit": "b33654e5ece5",
   "passed": false,
   "gates": [
     {
       "metric": "task_violations",
-      "value": 1,
+      "value": 2,
       "op": "<=",
       "threshold": 0,
       "passed": false
@@ -62,7 +62,7 @@
     }
   ],
   "aggregate": {
-    "task_violations": 1,
+    "task_violations": 2,
     "tool_violations": 1,
     "guardrail_violations": 2,
     "decision_violations": 1,
@@ -77,6 +77,7 @@
     "cost_usd": 0.096
   },
   "task": [
+    "required domain 'legal' was not assessed",
     "mandatory control LEG-01 has no finding"
   ],
   "tool": [

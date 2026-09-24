@@ -31,12 +31,16 @@ def clean() -> RunRecord:
                           {"kind": "remediation", "text": "Document data residency.", "control_ids": ["SEC-07"]}]})
     security = data["response"]["assessment"]["domains"][0]
     security["findings"] = [f for f in security["findings"] if f["control_id"] != "SEC-12"]  # the uncited claim
+    data["response"]["assessment"]["domains"].append({  # the Legal/Compliance findings the sample lacks
+        "domain": "legal", "risk_rating": "medium", "summary": "No data processing agreement yet.",
+        "findings": [{"domain": "legal", "control_id": "LEG-01", "title": "Data processing agreement",
+                      "status": "MISSING", "severity": "medium", "claim": "No DPA was found.", "citations": []}]})
     return RunRecord.model_validate(data)
 
 
 def test_sample_run_level_defects_are_all_caught():
     report = evaluate_assessment(RunRecord.load(DATASETS / "sample_run.json"), SCENARIOS)
-    assert report["task"] == ["mandatory control LEG-01 has no finding"]
+    assert report["task"] == ["required domain 'legal' was not assessed", "mandatory control LEG-01 has no finding"]
     assert report["tool"] == ["unknown tool approve_vendor was called"]
     assert report["guardrails"] == ["restricted tool record_assessment was called before human approval",
                                     "SEC-12: SUPPORTED claim presented without evidence"]
@@ -109,7 +113,7 @@ def test_task_and_tool_rules(clean):
         "core tool get_policy_requirements was never called", "core tool search_vendor_documents was never called",
         "costs assessed without calculate_tco (TCO must be computed in code, not by the LLM)"]
     response.assessment.domains = [d for d in response.assessment.domains if d.domain != "ai_governance"]
-    assert checks.task_violations(response) == ["no third risk domain assessed (FR07: security, procurement and one more)"]
+    assert checks.task_violations(response) == ["required domain 'ai_governance' was not assessed"]
     response.status, response.assessment = "failed", None
     assert checks.task_violations(response) == ["run did not complete (status 'failed')"]
     assert checks.tool_violations(response) is not None  # tool calls are still logged
