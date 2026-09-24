@@ -35,10 +35,17 @@ from hackathon2.rag.data_models import DocumentChunk, DocumentPage
 
 # Baseline defaults, overridable per call:
 # - CHUNK_SIZE = schemas.Evidence.quote's max_length, so any chunk can be cited whole.
-# - CHUNK_OVERLAP keeps the 20% ratio of the LangChain RAG tutorial (1000 / 200), so a
-#   sentence cut at a chunk boundary also appears in the neighbouring chunk.
+# - CHUNK_OVERLAP keeps the 20% ratio of the LangChain RAG tutorial (1000 / 200): the last
+#   whole sentence(s) of a chunk, if they fit in it, are repeated at the start of the next.
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 100
+
+# Where a block longer than chunk_size may be cut, in order of preference. pypdf ends a
+# line wherever the printed line ended -- usually mid-sentence -- so sentence ends (". ")
+# come before line breaks: chunks then end on whole sentences, and the overlap repeats
+# whole sentences. "\n" and " " are only fallbacks for a single sentence over chunk_size.
+# keep_separator="end" leaves the full stop on the sentence it ends.
+SEPARATORS = ["\n\n", ". ", "\n", " ", ""]
 
 # '3. Encryption', '2.1 Up to EUR 25,000 annual value', 'B. Encryption': a section
 # number (trailing dot optional) or a single capital letter with a dot, then a
@@ -52,7 +59,9 @@ def chunk_pages(
     pages: Iterable[DocumentPage], chunk_size: int = CHUNK_SIZE, chunk_overlap: int = CHUNK_OVERLAP
 ) -> list[DocumentChunk]:
     """Split pages (in document then page order, as load_knowledge returns them) into chunks."""
-    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap, separators=SEPARATORS, keep_separator="end"
+    )
     counters: Counter[str] = Counter()
     open_section: dict[str, Section | None] = {}  # doc_id -> section still open at the end of the last page
 
