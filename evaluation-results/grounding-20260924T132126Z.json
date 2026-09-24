@@ -1,0 +1,316 @@
+{
+  "suite": "grounding",
+  "created_at": "2026-09-24T13:21:26+00:00",
+  "git_commit": "3ca94900c5fe",
+  "passed": false,
+  "gates": [
+    {
+      "metric": "groundedness",
+      "value": 0.7142857142857143,
+      "op": ">=",
+      "threshold": 0.9,
+      "passed": false
+    },
+    {
+      "metric": "citation_correctness",
+      "value": 0.9473684210526315,
+      "op": ">=",
+      "threshold": 0.9,
+      "passed": true
+    },
+    {
+      "metric": "uncited_material",
+      "value": 0,
+      "op": "<=",
+      "threshold": 0,
+      "passed": true
+    }
+  ],
+  "aggregate": {
+    "material_findings": 14,
+    "groundedness": 0.7142857142857143,
+    "verdicts": {
+      "supported": 10,
+      "partially_supported": 3,
+      "unsupported": 1
+    },
+    "uncited_material": 0,
+    "citations": 19,
+    "citation_correctness": 0.9473684210526315,
+    "citation_problems": {
+      "not_supportive": 1
+    },
+    "judge_errors": 0
+  },
+  "findings": [
+    {
+      "control_id": "SEC-01",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence from the vendor document explicitly states that MFA for privileged administrators is enforced when the customer's identity provider enforces it, that role-based access control (RBAC) is implemented, and that there are no shared production admin accounts. This directly supports the claim and the status label of SUPPORTED.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sA#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-02",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence from the vendor document explicitly states that role-based access control (RBAC) is implemented (A2 RBAC: YES) and that there are no shared production admin accounts (A3 Shared production admin accounts: NO). This directly supports the claim and the status label of SUPPORTED.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sA#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-03",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence from the vendor document explicitly states that the vendor uses TLS 1.2 or higher for encryption in transit and AES-256 for encryption at rest, which directly supports the claim. There is no contradictory or missing information regarding the encryption standards mentioned in the claim or the status label.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sB#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-04",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence from the vendor document explicitly states that the vendor confirms both centralized logging and 24x7 security monitoring. There is no contradictory or missing information regarding these claims, and the status label 'SUPPORTED' is appropriate as the evidence fully backs the claim.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sC#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-05",
+      "status": "NON_COMPLIANT",
+      "verdict": "supported",
+      "reasoning": "The evidence states that the vendor's contract requires customer notification within 72 hours of confirmed impact unless law requires sooner, which matches the claim that the contract states notification within 72 hours. The claim also states this is slower than the 24-hour requirement, which is implied but not contradicted by the evidence. The status label NON_COMPLIANT is consistent with the evidence showing the requirement is not met. No other details contradict the claim.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sD#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-06",
+      "status": "NON_COMPLIANT",
+      "verdict": "partially_supported",
+      "reasoning": "The evidence states the vendor's critical vulnerability remediation target is 14 days and high vulnerability target is 45 days, which matches the claim about the vendor's targets. However, the evidence does not provide any information about NFS requirements or whether these targets meet or do not meet those requirements. Therefore, the claim that these targets do not meet NFS requirements and the NON_COMPLIANT status label are not supported by the evidence.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sC#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-07",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence explicitly states that customer content is not used for model training for enterprise tenants, which directly supports the claim. The status label 'SUPPORTED' is appropriate because the evidence fully backs the claim.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sE#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-08",
+      "status": "NON_COMPLIANT",
+      "verdict": "partially_supported",
+      "reasoning": "The evidence states that the vendor's default retention is 30 days and the minimum configurable retention is 7 days on Enterprise Plus, which matches the claim. However, the evidence does not mention anything about exceeding the 7-day limit without documented justification or any non-compliance. Therefore, the status label NON_COMPLIANT is not supported by the evidence.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sE#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-09",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "SEC-10",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "PRC-01",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence explicitly states that the proposal exceeds the EUR 100,000 threshold and requires Technology Investment Committee approval along with Business, Procurement, and Finance approvals. It directly supports the claim and the status label of SUPPORTED.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-pricing#s7#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "PRC-02",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "PRC-03",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence includes vendor documents that state the base subscription prices, implementation fees, and discounts for prepaid agreements, which directly supports the claim that pricing and contractual commitments are traceable to vendor documents. There is no contradictory or missing information regarding these elements.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-pricing#s5#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "vendor-x-pricing#s3#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "vendor-x-pricing#s6#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "PRC-04",
+      "status": "INFERRED",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "LEG-01",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence explicitly states that customer content is not used for model training for enterprise tenants (E1), the default retention is 30 days (E2), the minimum configurable retention is 7 days on Enterprise Plus (E3), and zero retention is not currently available but is on the roadmap (E4). All parts of the claim are directly supported by the evidence.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sE#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "LEG-02",
+      "status": "INFERRED",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "LEG-03",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sF#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "LEG-04",
+      "status": "NON_COMPLIANT",
+      "verdict": "supported",
+      "reasoning": "The evidence states that the vendor contract requires customer notification within 72 hours of confirmed impact unless law requires sooner. The claim that this does not meet the 24-hour contractual requirement is supported by the evidence, as the contract specifies 72 hours, which is longer than 24 hours. The status label NON_COMPLIANT is appropriate because the vendor's contract does not meet the 24-hour requirement.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sD#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "LEG-05",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "LEG-INTEGRITY",
+      "status": "INFERRED",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "AIG-01",
+      "status": "SUPPORTED",
+      "verdict": "partially_supported",
+      "reasoning": "The evidence states the vendor proposal documents the intended use (enterprise generative AI platform) and user count (2,000 NFS employees). However, it does not mention data classification or human oversight in security and operational controls, so those parts of the claim are not supported.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-proposal#s1#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "AIG-02",
+      "status": "SUPPORTED",
+      "verdict": "unsupported",
+      "reasoning": "The evidence states that the vendor proposes an AI platform for 2,000 employees but does not mention processing confidential data, risk classification, or vendor security claims. Therefore, it does not support the claim or the status label.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-proposal#s1#c1",
+          "problems": [
+            "not_supportive"
+          ]
+        }
+      ]
+    },
+    {
+      "control_id": "AIG-03",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sC#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sG#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "AIG-04",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "AIG-INTEGRITY",
+      "status": "INFERRED",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    }
+  ]
+}

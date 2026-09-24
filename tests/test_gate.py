@@ -103,6 +103,19 @@ def test_unverifiable_citations_are_removed_and_the_claim_downgraded():
     assert "not retrieved in this run" in notes and "prompt injection" in notes and "not in that chunk" in notes
 
 
+def test_a_vendor_status_needs_a_vendor_citation():
+    # FR05: SUPPORTED / NON_COMPLIANT / CONTRADICTED are claims about the vendor; a policy alone cannot prove them.
+    policy_only = [POLICY.to_evidence("Confidential data must be encrypted")]
+    result = apply_gate(_draft(_finding(policy_only)), REQUEST, _evidence())
+    finding = result.assessment.findings[0]
+    assert finding.status == "INFERRED" and [c.chunk_id for c in finding.citations] == [POLICY.chunk_id]
+    assert "SEC-01: NON_COMPLIANT without a vendor citation -> INFERRED." in result.assessment.gate_notes
+    vendor_only = [CLAIM.to_evidence("B1 TLS 1.2+: NO.")]
+    assert apply_gate(_draft(_finding(vendor_only)), REQUEST, _evidence()).assessment.findings[0].status == (
+        "NON_COMPLIANT"
+    )
+
+
 def test_quote_and_metadata_are_repaired_from_the_retrieved_chunk():
     citations = [
         POLICY.to_evidence("Confidential data must be encrypted in transit").model_copy(update={"page": 7}),
