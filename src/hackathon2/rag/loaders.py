@@ -23,7 +23,7 @@ from pypdf.errors import PdfReadError
 
 from hackathon2.config import Settings, get_settings
 from hackathon2.rag.data_models import DocumentInfo, DocumentPage, ExtractionIssue, KnowledgeLoad
-from hackathon2.rag.document_registry import classify
+from hackathon2.rag.document_registry import classify, vendor_tags
 from hackathon2.rag.errors import DocumentLoadError, UnknownDocumentError, UnsupportedDocumentError
 
 __all__ = ["DocumentLoadError", "UnknownDocumentError", "UnsupportedDocumentError", "load_knowledge", "load_pdf"]
@@ -93,7 +93,9 @@ def _classified_files(knowledge_dir: Path) -> list[tuple[Path, DocumentInfo]]:
     if unsupported:
         raise UnsupportedDocumentError(f"Only PDF files are supported; found: {', '.join(unsupported)}")
 
-    classified = [(p, classify(p.relative_to(knowledge_dir))) for p in files]
+    relative = [p.relative_to(knowledge_dir) for p in files]
+    known_vendors = vendor_tags(relative)
+    classified = [(p, classify(rel, known_vendors)) for p, rel in zip(files, relative, strict=True)]
 
     seen: dict[str, Path] = {}
     for path, info in classified:
