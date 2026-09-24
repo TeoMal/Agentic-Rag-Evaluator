@@ -28,9 +28,10 @@ SERIOUS = {"high", "critical"}
 # §2: the final assessment must give Security, Legal/Compliance, Procurement/Commercial and
 # AI Governance findings (FR07 alone would accept security, procurement and one more).
 REQUIRED_DOMAINS = {"security", "procurement", "legal", "ai_governance"}
-# The MCP tools in schemas.py; anything else was invented by the agent.
+# The tools the MCP server offers (mcp_server/server.py); anything else was invented by the agent.
 MCP_TOOLS = {"get_policy_requirements", "search_policy", "search_vendor_documents", "retrieve_document",
-             "get_vendor_history", "calculate_tco", "get_budget", "retrieve_prior_assessments", "record_assessment"}
+             "get_vendor_history", "calculate_tco", "get_approval_requirements", "retrieve_prior_assessments",
+             "record_assessment"}
 CORE_TOOLS = ("get_policy_requirements", "search_policy", "search_vendor_documents")
 
 # USD per 1M tokens -- gpt-4.1-mini list price; set these to your deployment's price.

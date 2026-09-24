@@ -2,7 +2,7 @@
 
 Every tool handed to an agent is wrapped by `instrument_tool`, which:
   - logs the call (RunMetrics.tools_called);
-  - records every chunk_id a tool returned -- the decision gate checks citations against this log;
+  - records every chunk a tool returned, with its text -- the decision gate checks citations against this log;
   - turns an exception inside a tool into a ToolResult "unavailable" instead of crashing the run (FR14);
   - notes non-ok results, so the assessment can be marked degraded_mode.
 
@@ -11,6 +11,7 @@ The wrapper works the same for the stub tools and for tools loaded from the MCP 
 
 import json
 import logging
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, get_args
 
@@ -19,7 +20,7 @@ from langchain_core.outputs import LLMResult
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, ValidationError
 
-from hackathon2.schemas import AssessmentRequest, RunMetrics, ToolResult, ToolStatus
+from hackathon2.schemas import AssessmentRequest, RunMetrics, SearchHit, ToolResult, ToolStatus
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,10 @@ _TOOL_STATUSES = frozenset(get_args(ToolStatus))
 @dataclass
 class RunContext:
     request: AssessmentRequest
+    run_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     retrieved_chunk_ids: set[str] = field(default_factory=set)
+    retrieved_hits: dict[str, SearchHit] = field(default_factory=dict)  # chunk_id -> hit, fullest text seen
+    tool_statuses: list[ToolStatus] = field(default_factory=list)  # every tool result, in call order
     tools_called: list[str] = field(default_factory=list)
     tool_failures: list[str] = field(default_factory=list)  # "unavailable" / "error" results
     denied_calls: list[str] = field(default_factory=list)  # "denied" results (authorization)
@@ -42,14 +46,29 @@ class RunContext:
         return bool(self.tool_failures)
 
     def record_tool_result(self, tool_name: str, result: ToolResult) -> None:
+        self.tool_statuses.append(result.status)
         if result.status == "ok":
             for item in result.results:
                 if isinstance(item, dict) and isinstance(item.get("chunk_id"), str):
                     self.retrieved_chunk_ids.add(item["chunk_id"])
+                    self._remember_hit(item)
         elif result.status == "denied":
             self.denied_calls.append(f"{tool_name}: {result.error}")
         else:
             self.tool_failures.append(f"{tool_name}: {result.status} - {result.error}")
+
+    def _remember_hit(self, item: dict) -> None:
+        """Keep the chunk's text for citation checks. A chunk seen again with more text (the whole
+        section, from retrieve_document) replaces the shorter version: it contains it."""
+        if "text" not in item:
+            return
+        try:
+            hit = SearchHit.model_validate(item)
+        except ValidationError:
+            return
+        known = self.retrieved_hits.get(hit.chunk_id)
+        if known is None or len(hit.text) > len(known.text):
+            self.retrieved_hits[hit.chunk_id] = hit
 
     def metrics(self, duration_seconds: float, subagents_called: list[str]) -> RunMetrics:
         return RunMetrics(

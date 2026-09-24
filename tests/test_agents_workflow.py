@@ -13,7 +13,6 @@ from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
 from hackathon2.agents.config import AgentSettings
-from hackathon2.agents.gate_fallback import provisional_gate
 from hackathon2.agents.runner import AssessmentRunner
 from hackathon2.agents.tools import stub_provider
 from hackathon2.schemas import AssessmentRequest, HumanDecision
@@ -148,7 +147,6 @@ def _runner(model, **provider_kwargs) -> AssessmentRunner:
         model=model,
         tools_provider=stub_provider(**provider_kwargs),
         domains=("security", "procurement"),
-        gate=provisional_gate,
         settings=AgentSettings(_env_file=None),
     )
 

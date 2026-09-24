@@ -1,13 +1,12 @@
-"""Reading specialist reports back, unassessed domains, the provisional gate and the report."""
+"""Reading specialist reports back, unassessed domains and the report. (The gate: test_agents_gate.py.)"""
 
 from langchain_core.messages import AIMessage, ToolMessage
 
 from hackathon2.agents.collect import collect_domain_reports, missing_domain_report, subagents_called
-from hackathon2.agents.gate_fallback import provisional_gate
 from hackathon2.agents.orchestrator import with_decision_basis
 from hackathon2.agents.report import render_markdown
 from hackathon2.agents.specialists import SUBAGENT_DOMAINS
-from hackathon2.schemas import AssessmentDraft, AssessmentRequest, DomainReport, Evidence, Finding
+from hackathon2.schemas import Assessment, AssessmentDraft, AssessmentRequest, DomainReport, Evidence, Finding
 
 REQUEST = AssessmentRequest(
     vendor_name="Asteria AI Systems",
@@ -96,24 +95,8 @@ def _draft(recommendation="CONDITIONAL_APPROVAL", risk="high") -> AssessmentDraf
     )
 
 
-def test_provisional_gate_requires_human_review_for_high_risk():
-    assessment = provisional_gate(_draft(), REQUEST, set(), degraded=False)
-    assert assessment.human_approval == "pending"
-    assert assessment.vendor_id == "asteria-ai-systems"
-
-
-def test_provisional_gate_lets_low_risk_rejection_through():
-    assessment = provisional_gate(_draft("REJECT", "low"), REQUEST, set(), degraded=False)
-    assert assessment.human_approval == "not_required"
-
-
-def test_provisional_gate_requires_review_when_degraded():
-    assessment = provisional_gate(_draft("REJECT", "low"), REQUEST, set(), degraded=True)
-    assert assessment.human_approval == "pending" and assessment.degraded_mode
-
-
 def test_markdown_report_names_gaps_and_citations():
-    text = render_markdown(provisional_gate(_draft(), REQUEST, set(), degraded=False))
+    text = render_markdown(Assessment.from_draft(_draft(), REQUEST))
     assert "CONDITIONAL APPROVAL" in text
     gaps = text.split("## Unknown (missing) or contradictory evidence")[1].split("##")[0]
     assert "**SEC-02** (UNKNOWN, high)" in gaps  # MISSING is shown in NFS vocabulary

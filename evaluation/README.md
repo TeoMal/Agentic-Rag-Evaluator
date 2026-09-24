@@ -28,7 +28,9 @@ uv run python -m evaluation.run calibrate --repeat 3     # can the judge be trus
 uv run python -m evaluation.run grounding                # the sample run below          (LLM)
 uv run python -m evaluation.run grounding --no-llm       # code checks only: free, deterministic
 uv run python -m evaluation.run grounding --record run.json          # a real assessment run
-uv run python -m evaluation.run retrieval --retriever pkg.module:fn  # once the RAG exists
+uv run python -m evaluation.live [--request hidden.json]  # one LIVE run, recorded, then assessment + grounding
+uv run python -m evaluation.run retrieval --retriever evaluation.retrievers:rag      # the RAG as MCP uses it
+uv run python -m evaluation.run retrieval --retriever evaluation.retrievers:keyword  # BM25 baseline, offline
 uv run python -m evaluation.run assessment               # the 6 run-level metrics (no LLM)
 uv run pytest tests/evaluation                           # tests of this code, no LLM
 ```

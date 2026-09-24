@@ -4,8 +4,9 @@
     corvid    an INVENTED second vendor that exists only in the stub tools. Use it to check that the
               agents generalise: it must be assessed without changing any prompt.
 
-Uses the real Azure OpenAI model (.env) and the tools selected by AGENT_TOOL_SOURCE (stub by default;
-corvid only exists there). Prints the executive report and the run metrics; exits 1 if the run failed.
+Uses the real Azure OpenAI model (.env) and the tools selected by AGENT_TOOL_SOURCE (the MCP server by
+default); corvid always runs on the stub tools, where it exists. Prints the executive report and the run
+metrics; exits 1 if the run failed.
 """
 
 import asyncio
@@ -14,6 +15,7 @@ import sys
 
 from hackathon2.agents.report import render_markdown
 from hackathon2.agents.runner import AssessmentRunner
+from hackathon2.agents.tools import stub_provider
 from hackathon2.schemas import AssessmentRequest
 
 REQUESTS: dict[str, AssessmentRequest] = {
@@ -44,7 +46,8 @@ def main() -> int:
         print(f"unknown vendor '{name}'; choose one of: {', '.join(REQUESTS)}")
         return 2
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    response = asyncio.run(AssessmentRunner().run(REQUESTS[name]))
+    runner = AssessmentRunner(tools_provider=stub_provider()) if name == "corvid" else AssessmentRunner()
+    response = asyncio.run(runner.run(REQUESTS[name]))
     if response.assessment is not None:
         print(render_markdown(response.assessment))
     print(f"status: {response.status}")

@@ -25,7 +25,7 @@ def test_exposes_every_contract_tool():
         "retrieve_document",
         "get_vendor_history",
         "calculate_tco",
-        "get_budget",
+        "get_approval_requirements",
         "retrieve_prior_assessments",
         "record_assessment",
     }
@@ -126,13 +126,14 @@ def test_record_assessment_requires_an_approval_token():
 def test_unavailable_backend_is_reported_not_raised():
     tools = _tools(unavailable=["search_policy"])
     assert _call(tools["search_policy"], query="encryption").status == "unavailable"
-    assert _call(tools["get_budget"], category="ai_platform").status == "ok"
+    assert _call(tools["get_vendor_history"], vendor_id="asteria-ai-systems").status == "ok"
 
 
-def test_no_budget_is_simulated():
-    # A budget figure picked here would decide the budget finding in advance.
-    result = _call(_tools()["get_budget"], category="ai_platform")
-    assert result.status == "ok" and result.results == []
+def test_approval_requirements_are_the_real_procurement_rules():
+    result = _call(_tools()["get_approval_requirements"], annual_value=1_000_000, data_classification="confidential")
+    rules = result.results[0]
+    assert result.status == "ok" and rules["competitive_sourcing_required"]
+    assert rules["citations"]  # every rule comes with its PR-001 chunk
 
 
 def test_invented_vendor_is_isolated_from_the_knowledge_pack_vendor():

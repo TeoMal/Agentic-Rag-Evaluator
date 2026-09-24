@@ -28,6 +28,7 @@ import getpass
 import json
 import os
 import platform
+import secrets
 import shutil
 import subprocess
 import sys
@@ -56,7 +57,10 @@ REQUIRED_LLM_KEYS = (
     "OPENAI_API_VERSION",
     "AZURE_OPENAI_DEPLOYMENT_NAME",
 )
-SECRET_KEYS = {"AZURE_OPENAI_API_KEY", "POSTGRES_PASSWORD"}
+SECRET_KEYS = {"AZURE_OPENAI_API_KEY", "POSTGRES_PASSWORD", "MCP_APPROVAL_SECRET"}
+# Signs human approvals for record_assessment (mcp_server/auth.py). Nobody needs to know it, so it is
+# generated into .env when missing instead of being asked for.
+APPROVAL_SECRET_KEY = "MCP_APPROVAL_SECRET"
 # Real environment variables win over .env (same rule as Compose and pydantic-settings).
 ENV_OVERRIDE_PREFIXES = ("AZURE_", "OPENAI_", "APP_", "POSTGRES_")
 DEFAULT_APP_PORT = "8020"
@@ -303,6 +307,17 @@ def prompt_for_missing(console: Console, missing: list[str]) -> None:
     console.say("  saved to .env")
 
 
+def ensure_approval_secret(console: Console, runner: Runner) -> None:
+    if parse_env(ENV_FILE.read_text(encoding="utf-8")).get(APPROVAL_SECRET_KEY) or os.environ.get(APPROVAL_SECRET_KEY):
+        return
+    if runner.dry_run:
+        console.say(f"[dry-run] would generate {APPROVAL_SECRET_KEY} into .env")
+        return
+    text = set_env_value(ENV_FILE.read_text(encoding="utf-8"), APPROVAL_SECRET_KEY, secrets.token_hex(32))
+    ENV_FILE.write_text(text, encoding="utf-8")
+    console.say(f"generated {APPROVAL_SECRET_KEY} in .env (signs human approvals; keep it private)")
+
+
 def docker_running(runner: Runner) -> bool:
     # A half-started daemon accepts the connection and never answers -- without
     # a timeout this probe hangs forever and the startup deadline never fires.
@@ -465,6 +480,7 @@ def cmd_local(args: argparse.Namespace, console: Console, runner: Runner) -> Non
     ensure_env_file(console)
     env_values = parse_env(ENV_FILE.read_text(encoding="utf-8"))
     prompt_for_missing(console, [k for k in REQUIRED_LLM_KEYS if not env_values.get(k)])
+    ensure_approval_secret(console, runner)
     env_values = parse_env(ENV_FILE.read_text(encoding="utf-8"))
     runner.secrets.update(v for k, v in env_values.items() if k in SECRET_KEYS and v)
     config = load_config()

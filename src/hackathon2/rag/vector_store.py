@@ -9,6 +9,8 @@ Callers only see ChunkStore, DocumentChunk and ChunkFilter; which database holds
 vectors is decided in get_vector_store():
 - PGVector (Postgres + pgvector, docker-compose `db`) when Settings.sqlalchemy_database_url is set;
 - an in-memory store otherwise (index lives in the process, rebuilt on every start).
+With no embedding model configured at all, retriever.open_retriever uses KeywordChunkStore
+(chunks in memory, no vectors) and searches it with BM25 only.
 
 What is stored: the chunk text is embedded, and every other DocumentChunk field is
 kept as metadata, so a search result is rebuilt into a complete DocumentChunk.
@@ -93,6 +95,11 @@ class ChunkStore(ABC):
         """Every indexed chunk with its full metadata, in chunk_id order (no scores)."""
         return [_to_chunk(doc, None) for doc in self._backend.get_by_ids(sorted(self._stored_ids()))]
 
+    def get(self, chunk_id: str) -> DocumentChunk | None:
+        """One indexed chunk by id (no score), or None if it is not in the index."""
+        docs = self._backend.get_by_ids([chunk_id])
+        return _to_chunk(docs[0], None) if docs else None
+
     def search(self, query: str, k: int = DEFAULT_K, where: ChunkFilter | None = None) -> list[DocumentChunk]:
         """The k chunks most similar to `query` that match `where`, best first, each with its score."""
         if k < 1:
@@ -167,6 +174,38 @@ class PGVectorChunkStore(ChunkStore):
                 select(store.EmbeddingStore.id).where(store.EmbeddingStore.collection_id == collection.uuid)
             )
             return {row[0] for row in rows}
+
+
+class KeywordChunkStore(ChunkStore):
+    """Chunks held in memory WITHOUT embeddings -- for keyword-only (BM25) retrieval when no
+    embedding model is configured. It cannot do similarity search; Retriever(mode="lexical")
+    searches it through lexical.BM25Index instead."""
+
+    def __init__(self) -> None:
+        self._chunks: dict[str, DocumentChunk] = {}
+
+    def add(self, chunks: Sequence[DocumentChunk]) -> None:
+        self._chunks.update((c.chunk_id, c) for c in chunks)
+
+    def replace(self, chunks: Sequence[DocumentChunk]) -> int:
+        stale = set(self._chunks) - {c.chunk_id for c in chunks}
+        self._chunks = {c.chunk_id: c for c in chunks}
+        return len(stale)
+
+    def all_chunks(self) -> list[DocumentChunk]:
+        return [self._chunks[chunk_id] for chunk_id in sorted(self._chunks)]
+
+    def get(self, chunk_id: str) -> DocumentChunk | None:
+        return self._chunks.get(chunk_id)
+
+    def _backend_filter(self, conditions: dict[str, list[str]]) -> Any:
+        raise NotImplementedError
+
+    def _scored_search(self, query: str, k: int, **kwargs: Any) -> list[tuple[Document, float]]:
+        raise NotImplementedError("a keyword-only store has no vector search; use Retriever(mode='lexical')")
+
+    def _stored_ids(self) -> set[str]:
+        return set(self._chunks)
 
 
 def get_vector_store(settings: Settings | None = None, embedder: Embeddings | None = None) -> ChunkStore:

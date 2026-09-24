@@ -50,6 +50,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-hackathon2}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hackathon2-local}
       POSTGRES_DB: ${POSTGRES_DB:-hackathon2}
+      # The MCP server's register of recorded assessments (record_assessment) -- on a volume, so
+      # it survives container rebuilds.
+      MCP_STATE_DIR: /app/state
+    volumes:
+      - mcpstate:/app/state
     ports:
       # 8020 -- HACKATHON_1 uses 8010, course unit 65 (Chroma) uses 8000.
       - "127.0.0.1:${APP_PORT:-8020}:8000"
@@ -60,3 +65,4 @@ services:
 
 volumes:
   pgdata:
+  mcpstate:

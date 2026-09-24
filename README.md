@@ -58,8 +58,11 @@ Plain Docker works too: `docker compose up -d --build` (images are then tagged `
 src/hackathon2/        the service (FastAPI, uvicorn --factory)
   config.py            all settings (env / .env)          llm.py       Azure OpenAI chat + embeddings
   health.py            /health subsystem checks             service.py   API + /ui (static/index.html)
-  agents/  rag/  mcp_server/  guardrails/                 to be built -- one package per team role
-tests/                 pytest (17 tests: config, API, deploy script)
+  agents/              orchestrator + specialists, decision gate adapter, recording
+  mcp_server/          NFS MCP server (tools, resources, prompts) + the agents' stdio client
+  rag/                 ingestion + retrieval (vector, hybrid, or keyword-only without embeddings)
+  guardrails/          injection scan, tool authorization, the decision gate
+tests/                 pytest: units per package + integration (API, agents <-> MCP <-> RAG)
 evaluation/            evaluation suite (FR14) -> results in evaluation-results/
 knowledge/             the NFS knowledge pack PDFs (RAG corpus, baked into the image)
 architecture/          design + course-unit map

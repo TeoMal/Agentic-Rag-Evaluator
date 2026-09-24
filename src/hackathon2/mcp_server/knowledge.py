@@ -4,19 +4,20 @@ The RAG package (hackathon2.rag, owned by the RAG engineer) reads the PDFs in
 knowledge/, chunks them, embeds them and stores them. This module does NOT read
 PDFs. It asks the retriever for chunks and turns them into safe SearchHits:
 
-    retriever result (LangChain Document + metadata)
+    rag.Retriever result (SearchHit, or a LangChain Document + metadata)
         -> SearchHit (schemas.py)
         -> injection check (second layer, independent of ingestion)
         -> text wrapped in <untrusted_document> tags
 
-What this module expects from hackathon2.rag.retriever (agree on this with the RAG engineer):
+What this module uses from hackathon2.rag (one Retriever per server process, from open_retriever()):
 
-    search(query: str, *, k: int, filter: dict | None = None) -> list[tuple[Document, float]]
-        Top-k chunks with relevance scores (higher = better), like PGVector's
-        similarity_search_with_relevance_scores. `filter` is an exact-match dict on
-        metadata, e.g. {"doc_type": "policy", "domain": "security"}.
-    get_chunk(chunk_id: str) -> Document | None
-    get_section(doc_id: str, section: str) -> list[Document]      # chunks of one section, in order
+    search(query, *, doc_types, domains, doc_ids, k) -> list[SearchHit]     best first, filters ANDed
+    get_chunk(chunk_id) -> SearchHit | None
+    get_section(doc_id, section) -> list[SearchHit]                         chunks of one section, in order
+
+open_retriever() builds the index on first use (vector search, or BM25 keyword search when no
+embedding model is configured). A backend that cannot be used raises; this module turns that
+into ConnectionError, so the tool answers "unavailable".
 
 Metadata every chunk must carry (set at ingestion):
 
@@ -47,6 +48,7 @@ evidence as missing/UNKNOWN instead of crashing (FR14).
 import json
 import logging
 import re
+from contextlib import contextmanager
 from functools import lru_cache
 from importlib import resources
 
@@ -68,9 +70,6 @@ KNOWLEDGE_DOCS: dict[str, tuple[str, DocType]] = {
     "vendor-beta-assessment": ("historical-vendor-assessments/vendor-beta-assessment.pdf", "enterprise_record"),
     "vendor-gamma-assessment": ("historical-vendor-assessments/vendor-gamma-assessment.pdf", "enterprise_record"),
 }
-
-# Over-fetch when filtering after retrieval (vendor/doc filters), then trim to k.
-FETCH_MULTIPLIER = 4
 
 # Second-layer injection check at the MCP boundary. Ingestion may flag chunks too; this
 # catches anything it missed. A flagged chunk is still returned -- it may contain real
@@ -187,19 +186,38 @@ def _default_doc_type(doc_id: str) -> DocType:
 # --------------------------------------------------------------------------------------
 
 
+@lru_cache(maxsize=1)
+def _open_retriever():
+    from hackathon2.rag import open_retriever  # imported lazily: the server lists its tools before RAG is ready
+
+    return open_retriever()
+
+
 def _retriever():
-    """Imported lazily: the server starts (and lists its tools) even before RAG is ready."""
+    """The process's Retriever. A failure is not cached: the next call tries again (e.g. once the DB is up)."""
     try:
-        from hackathon2.rag import retriever
-    except ImportError as exc:
-        raise ConnectionError("knowledge index not available (hackathon2.rag.retriever is missing)") from exc
-    return retriever
+        return _open_retriever()
+    except Exception as exc:  # ingestion, vector store or embedding configuration failures
+        raise ConnectionError(f"knowledge index not available ({type(exc).__name__}: {exc})") from exc
+
+
+@contextmanager
+def _retrieval():
+    """A search that could not run is 'unavailable', never an empty (= missing evidence) result."""
+    from hackathon2.rag import RetrievalUnavailableError
+
+    try:
+        yield
+    except RetrievalUnavailableError as exc:
+        raise ConnectionError(str(exc)) from exc
 
 
 def _to_hit(doc, score: float | None = None) -> SearchHit:
     """LangChain Document (or an existing SearchHit) -> safe SearchHit."""
     if isinstance(doc, SearchHit):
-        hit = doc if score is None else doc.model_copy(update={"score": score})
+        hit = SearchHit.model_validate(doc.model_dump(include=set(SearchHit.model_fields)))  # drop RAG-only fields
+        if score is not None:
+            hit = hit.model_copy(update={"score": score})
         raw_text, flagged = hit.text, hit.suspicious
     else:
         meta = doc.metadata or {}
@@ -257,15 +275,18 @@ def search(
             return []
         allowed_docs = {doc_id}
 
-    metadata_filter: dict = {"doc_type": doc_type}
-    if domain is not None:
-        metadata_filter["domain"] = domain
-    if allowed_docs is not None and len(allowed_docs) == 1:
-        metadata_filter["doc_id"] = next(iter(allowed_docs))
-
-    results = _unpack(_retriever().search(query, k=k * FETCH_MULTIPLIER, filter=metadata_filter))
-    hits = [_to_hit(doc, score) for doc, score in results]
-    if allowed_docs is not None:
+    retriever = _retriever()
+    with _retrieval():
+        results = retriever.search(
+            query,
+            doc_types=[doc_type],
+            domains=[domain] if domain is not None else None,
+            doc_ids=sorted(allowed_docs) if allowed_docs is not None else None,
+            k=k,
+            diversify_sources=doc_type == "vendor_claim",  # proposal, questionnaire and pricing each get a say
+        )
+    hits = [_to_hit(doc, score) for doc, score in _unpack(results)]
+    if allowed_docs is not None:  # the filter already did this; kept as a second line of defence
         hits = [h for h in hits if h.doc_id in allowed_docs]
     return hits[:k]
 
@@ -274,13 +295,15 @@ def get_chunk(chunk_id: str, expand_section: bool = False) -> SearchHit | None:
     """One chunk by id. With expand_section, the whole section it belongs to, joined in
     order and returned under the requested chunk_id (so citations stay valid)."""
     retriever = _retriever()
-    doc = retriever.get_chunk(chunk_id)
+    with _retrieval():
+        doc = retriever.get_chunk(chunk_id)
     if doc is None:
         return None
     hit = _to_hit(doc)
     if not expand_section or not hit.section:
         return hit
-    parts = [_to_hit(d) for d in retriever.get_section(hit.doc_id, hit.section)]
+    with _retrieval():
+        parts = [_to_hit(d) for d in retriever.get_section(hit.doc_id, hit.section)]
     if len(parts) <= 1:
         return hit
     text = "\n".join(re.sub(r"</?untrusted_document>", "", p.text) for p in parts)

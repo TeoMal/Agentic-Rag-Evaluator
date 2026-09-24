@@ -256,17 +256,22 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 2
 
-    gates = check_gates(args.suite, report["aggregate"])
-    print(f"== evaluation: {args.suite} ==\n{json.dumps(report['aggregate'], indent=2)}\n")
+    return 0 if finish(args.suite, report, save_results=not args.no_save) else 1
+
+
+def finish(suite: str, report: dict, *, save_results: bool = True) -> bool:
+    """Print a suite's aggregate and gates, save it, and say whether every gate passed."""
+    gates = check_gates(suite, report["aggregate"])
+    print(f"== evaluation: {suite} ==\n{json.dumps(report['aggregate'], indent=2)}\n")
     for g in gates:
         value = "not measured" if g["value"] is None else f"{g['value']:.3f}"
         mark = {True: "PASS", False: "FAIL", None: "n/a "}[g["passed"]]
         print(f"[{mark}] {g['metric']:<22} {value:>12}   (gate {g['op']} {g['threshold']:g})")
     passed = all(g["passed"] is not False for g in gates)
-    print(f"\n[{'PASS' if passed else 'FAIL'}] {args.suite}")
-    if not args.no_save:
-        print(f"results: {save(args.suite, report, gates)}")
-    return 0 if passed else 1
+    print(f"\n[{'PASS' if passed else 'FAIL'}] {suite}")
+    if save_results:
+        print(f"results: {save(suite, report, gates)}")
+    return passed
 
 
 if __name__ == "__main__":

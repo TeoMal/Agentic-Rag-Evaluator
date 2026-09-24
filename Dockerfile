@@ -37,7 +37,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:${PYTHON_VERSION}-slim AS runtime
 # Fixed uid so file ownership is predictable if a volume is ever mounted in.
-RUN useradd --create-home --uid 10001 appuser
+# /app/state is owned by appuser so the named volume mounted there (docker-compose.yml) is writable.
+RUN useradd --create-home --uid 10001 appuser     && mkdir -p /app/state && chown appuser:appuser /app/state
 WORKDIR /app
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --chown=appuser:appuser knowledge ./knowledge

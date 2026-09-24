@@ -69,7 +69,7 @@ def test_instructions_contain_no_corpus_hints(pattern):
 @pytest.mark.parametrize(
     "module",
     ["orchestrator.py", "prompts.py", "specialists.py", "runner.py", "collect.py", "context.py", "tools.py",
-     "gate_fallback.py", "report.py", "config.py"],
+     "gate.py", "recording.py", "report.py", "config.py"],
 )
 def test_agent_code_names_no_vendor(module):
     # Only the stub tools (test data) and the CLI presets may name a vendor.

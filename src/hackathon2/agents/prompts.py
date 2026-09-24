@@ -141,8 +141,10 @@ PROCUREMENT_FOCUS = """\
      may return several priced options; report the proposal as offered and, if your task description lists
      conditions from other domains that change what would be bought, the option that satisfies them. Never
      compute costs yourself; cite the pricing chunks (the source_chunk_id and the sections you retrieve).
-   - Call `get_budget` for the spend category that matches the use case. If no budget record is found, budget fit
-     is MISSING - do not assume it.
+   - Call `get_approval_requirements` with the annual value (the year-one total from `calculate_tco`) and the data
+     classification: it returns the approvers, whether competitive sourcing is required and any extra approvals,
+     each with its policy citation. No tool gives NFS budget figures: if budget fit matters, it is MISSING - do
+     not assume it.
    - Assess the procurement controls in the checklist against the evidence."""
 
 LEGAL_FOCUS = """\

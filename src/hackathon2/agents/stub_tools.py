@@ -15,9 +15,9 @@ a hidden vendor case is assessed on the day).
 
 Simulated, because the knowledge pack does not contain them: the requirements checklist (an
 extraction of the policies' mandatory controls, from the policies only), the vendor history, and the
-pricing tables behind calculate_tco (transcribed from each vendor's pricing document). There is no
-budget record: get_budget finds nothing, and budget fit must come out as MISSING.
-TEMPORARY -- the MCP server replaces all of this.
+pricing tables behind calculate_tco (transcribed from each vendor's pricing document).
+get_approval_requirements is not simulated: it runs the MCP server's own PR-001 rules.
+Offline test double -- real runs use the MCP server (AGENT_TOOL_SOURCE=mcp, the default).
 """
 
 import re
@@ -424,9 +424,6 @@ PRICING: dict[str, dict] = {
     },
 }
 
-# No budget record is simulated: a number chosen here would decide the budget finding in advance.
-BUDGETS: dict[str, dict] = {}
-
 VENDOR_HISTORY: dict[str, list[dict]] = {
     VENDOR_ID: [
         {
@@ -573,10 +570,10 @@ def _retrieve_prior_assessments(vendor_id: str | None, category: str | None) -> 
     return ToolResult.ok([_hit(c) for c in records])
 
 
-def _get_budget(category: str) -> ToolResult:
-    """Searched, nothing on record -> an empty ok result (MISSING), not a tool failure."""
-    budget = BUDGETS.get(category)
-    return ToolResult.ok([budget] if budget else [])
+def _get_approval_requirements(annual_value: float, data_classification: str | None, ai_system: bool) -> ToolResult:
+    from hackathon2.mcp_server.enterprise import approval_requirements  # the server's own PR-001 rules
+
+    return ToolResult.ok([approval_requirements(annual_value, data_classification, ai_system)])
 
 
 def _record_assessment(assessment: dict, approval_token: str | None) -> ToolResult:
@@ -597,7 +594,9 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "calculate_tco": "Compute total cost of ownership from the vendor's pricing for a number of seats and years. "
     "Returns the proposal as offered first, then one result per optional extra in the vendor's offer (named in "
     "the breakdown). Use these numbers; never compute costs yourself.",
-    "get_budget": "Approved annual budget for a spend category. An empty result means no budget is on record.",
+    "get_approval_requirements": "Which NFS approvals a purchase needs under the Procurement Policy (PR-001): "
+    "approvers by annual value, whether competitive sourcing applies, and extra approvals for Confidential data "
+    "and AI systems, each with its policy citation.",
     "retrieve_prior_assessments": "Earlier NFS vendor assessments and their decisions (precedents). Call without "
     "vendor_id to get precedents from other vendors; optionally filter by a category keyword.",
     "record_assessment": "RESTRICTED. Store a final assessment. Requires an approval token from human review.",
@@ -635,8 +634,12 @@ def build_stub_tools(unavailable: Iterable[str] = (), *, fail_all: bool = False)
     def calculate_tco(vendor_id: str, seats: int, years: int) -> str:
         return guard("calculate_tco") or _calculate_tco(vendor_id, seats, years).model_dump_json()
 
-    def get_budget(category: str) -> str:
-        return guard("get_budget") or _get_budget(category).model_dump_json()
+    def get_approval_requirements(
+        annual_value: float, data_classification: str | None = None, ai_system: bool = True
+    ) -> str:
+        return guard("get_approval_requirements") or _get_approval_requirements(
+            annual_value, data_classification, ai_system
+        ).model_dump_json()
 
     def retrieve_prior_assessments(vendor_id: str | None = None, category: str | None = None) -> str:
         return guard("retrieve_prior_assessments") or _retrieve_prior_assessments(vendor_id, category).model_dump_json()
@@ -651,7 +654,7 @@ def build_stub_tools(unavailable: Iterable[str] = (), *, fail_all: bool = False)
         retrieve_document,
         get_vendor_history,
         calculate_tco,
-        get_budget,
+        get_approval_requirements,
         retrieve_prior_assessments,
         record_assessment,
     )

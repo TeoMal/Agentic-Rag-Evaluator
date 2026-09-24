@@ -4,12 +4,14 @@
     hits = retriever.search("incident notification deadline",
                             doc_types=["policy"], domains=["security"], k=5)
     hybrid = open_retriever(mode="hybrid")               # vector + BM25, fused with RRF
+    retriever.get_chunk("information-security-policy#s3#c1")               # one chunk by id
+    retriever.get_section("information-security-policy", "3. Encryption")  # a section's chunks, in order
 
 Returns schemas.SearchHit objects (the knowledge tools' contract), each with the chunk
 text, chunk_id, doc_id, source, page, section (None when not reliably known),
 doc_type, domain, suspicious flag and score.
 
-Two retrieval modes, both kept so they can be evaluated against each other:
+Three retrieval modes, kept so they can be evaluated against each other:
 - "vector" (default, the baseline): semantic similarity only; score = cosine similarity.
 - "hybrid": the vector ranking and a BM25 keyword ranking (lexical.py) over the same
   filtered chunks, each FETCH_K deep, merged with Reciprocal Rank Fusion:
@@ -18,7 +20,10 @@ Two retrieval modes, both kept so they can be evaluated against each other:
   rankings rise; ties are broken by chunk_id, so the order is deterministic.
   score = that fused RRF score -- a different scale from cosine similarity, so a
   min_score chosen for one mode does not carry over to the other.
-Metadata filters apply to both rankings in the same way.
+- "lexical": the BM25 keyword ranking alone; score = BM25 score. open_retriever() falls back
+  to it when no embedding model is configured or the vector index is unusable, so the
+  knowledge pack stays searchable.
+Metadata filters apply to every ranking in the same way.
 
 What this module deliberately does NOT do:
 - decide anything (no PASS/FAIL, no APPROVE/REJECT) -- that is the agents' and the
@@ -39,16 +44,17 @@ from typing import Literal
 
 from hackathon2.config import Settings, get_settings
 from hackathon2.rag.citations import RetrievalLog
-from hackathon2.rag.data_models import ChunkFilter, KnowledgeDomain
-from hackathon2.rag.errors import RetrievalUnavailableError
+from hackathon2.rag.data_models import ChunkFilter, DocumentChunk, KnowledgeDomain
+from hackathon2.rag.embeddings import embeddings_configured
+from hackathon2.rag.errors import DocumentLoadError, RetrievalUnavailableError
 from hackathon2.rag.ingest import ingest
 from hackathon2.rag.lexical import BM25Index
-from hackathon2.rag.vector_store import DEFAULT_K, ChunkStore, get_vector_store
+from hackathon2.rag.vector_store import DEFAULT_K, ChunkStore, KeywordChunkStore, get_vector_store
 from hackathon2.schemas import DocType, SearchHit
 
 logger = logging.getLogger(__name__)
 
-RetrievalMode = Literal["vector", "hybrid"]
+RetrievalMode = Literal["vector", "hybrid", "lexical"]
 
 # Candidates considered before re-ranking (source diversity, hybrid fusion): the default
 # fetch_k LangChain uses for the same purpose in max_marginal_relevance_search.
@@ -68,7 +74,8 @@ class Retriever:
         self._store = store
         self.log = log
         self.mode = mode
-        self._lexical: dict[str, BM25Index] = {}  # built on first hybrid search, shared with with_log() copies
+        # BM25 index and chunk list, built on first use and shared with with_log() copies
+        self._lexical: dict[str, BM25Index | list[DocumentChunk]] = {}
 
     def with_log(self, log: RetrievalLog) -> "Retriever":
         """A retriever over the same index and mode that records into `log` -- one per assessment run."""
@@ -106,9 +113,12 @@ class Retriever:
         where = ChunkFilter(
             doc_types=_listed(doc_types), domains=_listed(domains), doc_ids=_listed(doc_ids), vendors=_listed(vendors)
         )
-        fetch = max(k, FETCH_K) if (diversify_sources or self.mode == "hybrid") else k
+        fetch = max(k, FETCH_K) if (diversify_sources or self.mode != "vector") else k
         try:
-            hits: list[SearchHit] = list(self._store.search(query, k=fetch, where=where))
+            if self.mode == "lexical":
+                hits: list[SearchHit] = list(self._lexical_index().search(query, fetch, where))
+            else:
+                hits = list(self._store.search(query, k=fetch, where=where))
             if self.mode == "hybrid":
                 hits = _reciprocal_rank_fusion([hits, self._lexical_index().search(query, fetch, where)])
         except Exception as exc:
@@ -118,9 +128,35 @@ class Retriever:
             self.log.record(hits)
         return hits
 
+    def get_chunk(self, chunk_id: str) -> SearchHit | None:
+        """One indexed chunk by id, or None if there is no such chunk."""
+        try:
+            chunk = self._store.get(chunk_id)
+        except Exception as exc:
+            raise RetrievalUnavailableError(f"Chunk lookup could not be run: {exc}") from exc
+        if chunk is not None and self.log is not None:
+            self.log.record([chunk])
+        return chunk
+
+    def get_section(self, doc_id: str, section: str) -> list[SearchHit]:
+        """Every chunk of one section of one document, in document order ([] if there is none)."""
+        chunks = [c for c in self._chunks() if c.doc_id == doc_id and c.section == section]
+        chunks.sort(key=lambda c: int(c.chunk_id.rsplit("#c", 1)[1]))
+        if self.log is not None:
+            self.log.record(chunks)
+        return chunks
+
+    def _chunks(self) -> list[DocumentChunk]:
+        if "chunks" not in self._lexical:
+            try:
+                self._lexical["chunks"] = self._store.all_chunks()
+            except Exception as exc:
+                raise RetrievalUnavailableError(f"Index could not be read: {exc}") from exc
+        return self._lexical["chunks"]
+
     def _lexical_index(self) -> BM25Index:
         if "bm25" not in self._lexical:
-            self._lexical["bm25"] = BM25Index(self._store.all_chunks())
+            self._lexical["bm25"] = BM25Index(self._chunks())
         return self._lexical["bm25"]
 
 
@@ -129,16 +165,43 @@ def open_retriever(
 ) -> Retriever:
     """A Retriever over `store` (default: get_vector_store()), ingesting first if the index is empty.
 
+    With no store given, the knowledge pack is loaded into a KeywordChunkStore and searched in
+    "lexical" mode (BM25 only) when no embedding model is configured (logged as a warning) or
+    when the vector index cannot be built or reached (logged as an error) -- keyword evidence
+    instead of none. A knowledge pack that cannot be loaded still raises.
+
     An empty index would make every search return nothing -- indistinguishable from
-    missing evidence -- so it is built here, and a failure to build it raises
-    (IngestionError / DocumentLoadError / VectorStoreUnavailableError) instead of
+    missing evidence -- so it is built here; with an explicit `store`, a failure to build
+    it raises (IngestionError / DocumentLoadError / VectorStoreUnavailableError) instead of
     returning a retriever that finds nothing. Open a new retriever after re-ingesting:
     the hybrid keyword index is built from the chunks present at first use.
     """
     settings = settings or get_settings()
-    store = store or get_vector_store(settings)
+    if store is not None:
+        return _open(settings, store, mode)
+    if not embeddings_configured(settings):
+        logger.warning(
+            "No embedding model configured (AZURE_OPENAI_EMBEDDING_DEPLOYMENT); "
+            "keyword-only (BM25) retrieval over %s",
+            settings.knowledge_dir,
+        )
+        return _open(settings, KeywordChunkStore(), "lexical")
+    try:
+        return _open(settings, get_vector_store(settings), mode)
+    except DocumentLoadError:
+        raise  # the knowledge pack itself is wrong: keyword search would fail the same way
+    except Exception as exc:  # noqa: BLE001 -- embedding deployment or vector database unusable
+        logger.error(
+            "Vector index unavailable (%s: %s); falling back to keyword-only (BM25) retrieval",
+            type(exc).__name__,
+            exc,
+        )
+        return _open(settings, KeywordChunkStore(), "lexical")
+
+
+def _open(settings: Settings, store: ChunkStore, mode: RetrievalMode) -> Retriever:
     if store.size() == 0:
-        logger.info("Vector index is empty; ingesting %s", settings.knowledge_dir)
+        logger.info("Index is empty; ingesting %s", settings.knowledge_dir)
         ingest(settings, store)
     return Retriever(store, mode=mode)
 

@@ -16,11 +16,17 @@ from langchain_core.embeddings import Embeddings
 from hackathon2.config import Settings, get_settings
 from hackathon2.llm import LLMNotConfiguredError, get_embeddings
 
-__all__ = ["Embeddings", "EmbeddingsNotConfiguredError", "get_embedder"]
+__all__ = ["Embeddings", "EmbeddingsNotConfiguredError", "embeddings_configured", "get_embedder"]
 
 # Raised by get_embedder when the embedding settings are missing; re-exported so RAG
 # callers do not import the provider module.
 EmbeddingsNotConfiguredError = LLMNotConfiguredError
+
+
+def embeddings_configured(settings: Settings | None = None) -> bool:
+    """Whether get_embedder() can build an embedder (without building one)."""
+    settings = settings or get_settings()
+    return bool(settings.llm_configured and settings.azure_openai_embedding_deployment)
 
 
 def get_embedder(settings: Settings | None = None) -> Embeddings:

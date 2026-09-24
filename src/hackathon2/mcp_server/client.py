@@ -45,9 +45,10 @@ Tracing: these tools are ordinary LangChain tools, so the Langfuse CallbackHandl
 agent runs with already records every call (input, output with our status envelope,
 duration) as a tool span. Nothing extra is needed here.
 
-Roles: the four specialists and the orchestrator are LLM roles. "system" is for our own code
-only (the human-approval endpoint); it is the only role that may call record_assessment, so no
-LLM is ever handed that tool.
+Roles: the four specialists and the orchestrator are LLM roles. "agents" is what the agent
+runner loads (agents/tools.py): every LLM role's tools on one session -- it then hands each agent
+only that agent's own allow-list. "system" is for our own code only (the human-approval step);
+it is the only role that may call record_assessment, so no LLM is ever handed that tool.
 """
 
 import asyncio
@@ -79,7 +80,7 @@ DEFAULT_TIMEOUT_SECONDS = 30
 TRANSPORT_RETRIES = 1
 RETRY_BACKOFF_SECONDS = 0.5
 
-Role = Literal["orchestrator", "security", "procurement", "legal", "ai_governance", "system"]
+Role = Literal["orchestrator", "security", "procurement", "legal", "ai_governance", "agents", "system"]
 
 _EVIDENCE_TOOLS = frozenset(
     {"get_policy_requirements", "search_policy", "search_vendor_documents", "retrieve_document"}
@@ -96,6 +97,7 @@ TOOLS_BY_ROLE: dict[Role, frozenset[str]] = {
 
 RESTRICTED_TOOLS = frozenset({"record_assessment"})
 LLM_ROLES: tuple[Role, ...] = ("orchestrator", "security", "procurement", "legal", "ai_governance")
+TOOLS_BY_ROLE["agents"] = frozenset().union(*(TOOLS_BY_ROLE[role] for role in LLM_ROLES))
 
 
 class McpUnavailableError(RuntimeError):

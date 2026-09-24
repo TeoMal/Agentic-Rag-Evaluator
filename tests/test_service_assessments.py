@@ -1,6 +1,6 @@
 """The assessment API and the web UI, over HTTP: request in, assessment out, human review.
 
-The runner is the real AssessmentRunner (stub tools, provisional gate); only the agent run is
+The runner is the real AssessmentRunner (stub tools, real decision gate); only the agent run is
 canned, so these tests check the API wiring -- the agent's own wiring is test_agents_workflow.py.
 """
 
@@ -11,7 +11,6 @@ from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 
 from hackathon2.agents.config import AgentSettings
-from hackathon2.agents.gate_fallback import provisional_gate
 from hackathon2.agents.runner import AssessmentRunner
 from hackathon2.agents.tools import stub_provider
 from hackathon2.schemas import (
@@ -39,7 +38,7 @@ class HeldForReview(AssessmentRunner):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(
-            tools_provider=stub_provider(), gate=provisional_gate, settings=AgentSettings(_env_file=None), **kwargs
+            tools_provider=stub_provider(), settings=AgentSettings(_env_file=None), **kwargs
         )
         self.requests: list[AssessmentRequest] = []
 
@@ -155,7 +154,6 @@ def test_model_failure_comes_back_as_a_failed_assessment(make_settings):
     runner = AssessmentRunner(
         model=BrokenModel(messages=iter([])),
         tools_provider=stub_provider(),
-        gate=provisional_gate,
         settings=AgentSettings(_env_file=None),
     )
     client = TestClient(create_app(make_settings(), runner=runner))

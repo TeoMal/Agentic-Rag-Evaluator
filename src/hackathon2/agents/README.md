@@ -2,14 +2,14 @@
 
 Covers FR02 (plan), FR07 (risk domains), FR11 (decision) and the agent side of FR05, FR10, FR12 and
 FR14, plus the specialist agents of handout section 8. Everything here is built on the shared contracts in
-`hackathon2/schemas.py` and runs today without RAG, MCP or guardrails, on stub tools that serve the real
-knowledge-pack text.
+`hackathon2/schemas.py`. The tools come from the NFS MCP server (which searches the knowledge pack through
+RAG); the decision gate is the guardrails' `gate_assessment`. Offline stub tools remain for tests.
 
 ## Run it
 
 ```bash
-uv run python -m hackathon2.agents              # one Asteria assessment, real model, stub tools
-uv run python -m hackathon2.agents corvid       # the invented second vendor (generalisation check)
+uv run python -m hackathon2.agents              # one Asteria assessment: real model, MCP server, RAG
+uv run python -m hackathon2.agents corvid       # the invented second vendor, on stub tools (generalisation check)
 uv run pytest tests -k agents                   # no model, no network
 ```
 
@@ -39,8 +39,12 @@ AssessmentRequest
        -> FinalDecision (recommendation, risk, cited decision_basis, conditions, summary -- no findings)
   -> reports read back from the conversation; a domain without a valid report -> MISSING (UNKNOWN) finding
   -> AssessmentDraft = FinalDecision + reports verbatim + "Decision basis" line
-  -> decision gate (guardrails.apply_gate, or the provisional one)
-  -> AssessmentResponse: completed | awaiting_approval | failed
+  -> mandatory controls fetched by code (get_policy_requirements, every domain)
+  -> decision gate (gate.py): repair what code can check, then guardrails.gate_assessment on the run's
+     evidence (retrieved chunks with text, mandatory controls, every tool status)
+  -> AssessmentResponse: completed (gate allowed; recorded) | awaiting_approval | failed (blocked, or broken)
+decide(): approved -> recording.py signs the assessment, guardrails.authorize_tool_call checks the call,
+          the MCP server's record_assessment verifies the signature again and stores it
 ```
 
 The orchestrator never rewrites findings: code attaches the specialists' reports verbatim, so a finding or
@@ -55,7 +59,7 @@ The handout forbids hard-coding expected answers, and a hidden vendor is assesse
   description, the FinalDecision schema or a tool description, or if agent code names a vendor.
 - Decision rules, the rating scale and precedents are retrieved at run time and cited in `decision_basis`, so
   the recommendation is traceable (PR-001 section 6).
-- The stub simulates no budget: a number picked by us would decide the budget finding in advance.
+- No tool gives budget figures: a number picked by us would decide the budget finding in advance.
 - `python -m hackathon2.agents corvid` assesses an invented second vendor with different problems, using the
   same prompts. If it needs a prompt change to work, the prompts were fitted to Asteria.
 
@@ -67,10 +71,11 @@ The handout forbids hard-coding expected answers, and a hidden vendor is assesse
 | `orchestrator.py` | `build_orchestrator()`, `FinalDecision`, `render_request()` |
 | `specialists.py` | the 4 specialists: names, descriptions, tools, `DomainReport` output |
 | `prompts.py` | system prompts |
-| `tools.py` | tool providers (stub / MCP) and the per-agent tool allowlists |
-| `context.py` | per-run log: retrieved chunk_ids, tool failures, tokens; `instrument_tool()` |
+| `tools.py` | tool providers (MCP server per run / stub) and the per-agent tool allowlists |
+| `context.py` | per-run log: retrieved chunks with text, tool statuses, tokens; `instrument_tool()` |
 | `collect.py` | reads DomainReports back from `task` results; MISSING placeholder |
-| `gate_fallback.py` | provisional gate until guardrails ships `apply_gate` |
+| `gate.py` | the decision gate: citation repairs + `guardrails.gate_assessment` on the run's evidence |
+| `recording.py` | records a final assessment: signed token + `guardrails.authorize_tool_call` + MCP |
 | `stub_tools.py` | offline tools serving the knowledge-pack text, one chunk per section |
 | `report.py` | executive report as Markdown (MISSING shown as UNKNOWN, NFS vocabulary) |
 
@@ -78,31 +83,30 @@ The handout forbids hard-coding expected answers, and a hidden vendor is assesse
 
 | With | What we agreed / need | Where |
 |---|---|---|
-| MCP | tool names and arguments exactly as in the `schemas.py` docstring; results are a `ToolResult` (JSON string or text content block); server reachable at `AGENT_MCP_URL` over streamable HTTP | `tools.py` |
-| MCP | how `record_assessment` approval tokens are issued (placeholder: `human-review:<reviewer>`) | `runner.py::_record` |
+| MCP | the server is started per run over stdio by `mcp_server.client.open_mcp_toolbox` (role `agents`; in-process fallback); procurement uses `get_approval_requirements` (the server has no `get_budget`) | `tools.py` |
+| MCP | approval tokens: `mcp_server.auth.issue_approval_token` (HMAC, `MCP_APPROVAL_SECRET`), verified again by the server | `recording.py` |
 | RAG | `chunk_id` values stable within a run; `SearchHit.text` wrapped in `<untrusted_document>` | used by prompts and `context.py` |
 | RAG / MCP | vendor documents are named `vendor-x-*`, not after the vendor: ingestion must tag them with the vendor_id (`asteria-ai-systems`) for `search_vendor_documents(vendor_id=...)` to find them -- and the same for the hidden vendor | ingestion |
 | MCP | `calculate_tco` returns one result per offered configuration (base, then tiers/add-ons named in `breakdown`) | `stub_tools.py::_calculate_tco` |
 | MCP | `retrieve_prior_assessments()` without vendor_id returns the historical assessments as citable chunks | `stub_tools.py` |
-| Guardrails | `apply_gate(draft, request, retrieved_chunk_ids, degraded) -> Assessment` exported from `hackathon2.guardrails` -- picked up automatically | `gate_fallback.py` |
+| Guardrails | `gate_assessment(assessment, context=GateContext)` -> allow / require_review / deny; `authorize_tool_call` before `record_assessment` | `gate.py`, `recording.py` |
 | Guardrails | agent middleware goes into `AssessmentRunner(middleware=..., subagent_middleware=...)` | `runner.py` |
-| API | endpoints call `run()` / `decide()` / `get()`; results are in memory for now | `service.py` (not ours) |
+| API | `POST /assessments`, `GET /assessments/{id}`, `POST /assessments/{id}/decision` call `run()` / `get()` / `decide()`; results are in memory | `service.py` |
 | Evaluation | `AssessmentResponse` with `RunMetrics` (tools, subagents, chunk_ids, tokens, duration) per run | `runner.py` |
 
 ## Settings (AGENT_*)
 
 | Variable | Default | |
 |---|---|---|
-| `AGENT_TOOL_SOURCE` | `stub` | `mcp` to use the MCP server |
-| `AGENT_MCP_URL` | - | required with `mcp` |
+| `AGENT_TOOL_SOURCE` | `mcp` | `stub` for offline test data |
 | `AGENT_RECURSION_LIMIT` | `250` | orchestrator step budget |
 | `AGENT_TEMPERATURE` | `0.0` | empty for reasoning models that reject a temperature |
 
-## Stub corpus (temporary)
+## Stub corpus (offline tests)
 
 `stub_tools.py` serves the text of the supplied knowledge pack (5 policies, 3 vendor documents, 3 historical
 assessments), one chunk per numbered section, with chunk ids like `information-security-policy#s6#c1` or
-`vendor-x-security-questionnaire#sE#c1`. Search is keyword overlap; RAG replaces it.
+`vendor-x-security-questionnaire#sE#c1`. Search is keyword overlap; real runs use RAG through MCP.
 
 It also contains an INVENTED vendor, Corvid Document AI (`vendor-y-*`, vendor_id `corvid-document-ai`), which
 is not part of the knowledge pack. Its documents differ on purpose: a shared admin account, a 48-hour incident
@@ -112,7 +116,7 @@ instruction to the assessor. It exists only to check that the agents generalise.
 Simulated, because the knowledge pack does not contain them: the requirements checklist behind
 `get_policy_requirements` (extracted from the policies only, every control citing its policy chunk), the
 vendor history and the pricing tables behind `calculate_tco` (transcribed from each vendor's pricing
-document; it reproduces Asteria's own year-one totals). No budget record exists, so budget fit must come out
-as MISSING. All of this belongs to the MCP server after the merge.
+document; it reproduces Asteria's own year-one totals). `get_approval_requirements` runs the MCP server's
+own PR-001 rules.
 
-Switch to the real MCP server with `AGENT_TOOL_SOURCE=mcp`; no code changes.
+Real runs use the MCP server (`AGENT_TOOL_SOURCE=mcp`, the default); `stub` is for tests only.
