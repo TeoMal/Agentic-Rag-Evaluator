@@ -1,0 +1,10 @@
+{
+  "_status": "Which documents belong to which vendor. For a new (e.g. hidden) vendor: put its PDFs in knowledge/, re-run ingestion, and add one entry here. document ids = PDF file names without .pdf.",
+  "vendors": {
+    "asteria-ai-systems": {
+      "name": "Asteria AI Systems",
+      "aliases": ["Asteria", "Vendor X"],
+      "documents": ["vendor-x-proposal", "vendor-x-security-questionnaire", "vendor-x-pricing"]
+    }
+  }
+}

@@ -9,6 +9,9 @@ Usage (one server process for a whole assessment run):
         ...
         result = await toolbox.call("system", "record_assessment", {...})   # code-only call
         toolbox.calls                                                        # what was called, for metrics
+        toolbox.retrieved_chunk_ids   # chunks whose TEXT a tool returned -- the decision gate checks citations
+        await toolbox.read_resource("nfs://requirements/security")           # reference material
+        await toolbox.get_prompt("specialist_brief", {"domain": "security", "vendor_name": "..."})
 
 What every tool call goes through (the interceptor, in this order):
 
@@ -17,14 +20,21 @@ What every tool call goes through (the interceptor, in this order):
   2. the call     -- over the open stdio session, with a read timeout;
   3. failure net  -- a transport failure is retried once (not timeouts); if it still fails it
                      becomes status "unavailable", so the agent records MISSING evidence instead of
-                     the run crashing (FR15);
+                     the run crashing (FR14);
   4. record       -- an entry in `toolbox.calls` (role, tool, status, duration) for the
-                     evaluation's tool-correctness and latency metrics.
+                     evaluation's tool-correctness and latency metrics, and the ids the result
+                     contained (see "Citations" below).
 
-Fallback (FR15): if the server subprocess cannot start, open_mcp_toolbox runs the SAME server
+Citations: `toolbox.retrieved_chunk_ids` lists every chunk whose text a tool returned in this
+run (search results, retrieve_document). `toolbox.referenced_ids` lists ids a tool returned
+without the text (pricing sources, control sources, prior assessments, policy citations).
+The decision gate should accept a citation only if its chunk_id is in `citable_ids`; anything
+else was not seen by the agent and is downgraded.
+
+Fallback (FR14): if the server subprocess cannot start, open_mcp_toolbox runs the SAME server
 inside this process over an in-memory MCP connection. The agent code cannot tell the difference
 and every rule (roles, approval tokens, safe_tool) still applies; the toolbox is marked degraded.
-γτι
+
 Degraded mode: `toolbox.degraded` is True when the fallback was used or any tool answered
 "unavailable"; `toolbox.degraded_reasons` says why. Copy both into the final assessment:
 
@@ -78,7 +88,7 @@ _EVIDENCE_TOOLS = frozenset(
 TOOLS_BY_ROLE: dict[Role, frozenset[str]] = {
     "orchestrator": frozenset({"get_policy_requirements", "retrieve_prior_assessments"}),
     "security": _EVIDENCE_TOOLS | {"get_vendor_history"},
-    "procurement": _EVIDENCE_TOOLS | {"calculate_tco", "get_budget", "get_vendor_history"},
+    "procurement": _EVIDENCE_TOOLS | {"calculate_tco", "get_approval_requirements", "get_vendor_history"},
     "legal": _EVIDENCE_TOOLS | {"retrieve_prior_assessments"},
     "ai_governance": _EVIDENCE_TOOLS | {"retrieve_prior_assessments"},
     "system": frozenset({"record_assessment", "retrieve_prior_assessments"}),
@@ -148,6 +158,30 @@ class McpToolbox:
         self.mode = mode
         self.calls: list[ToolCall] = []
         self.degraded_reasons: list[str] = list(degraded_reasons or [])
+        self.retrieved_chunk_ids: list[str] = []
+        self.referenced_ids: list[str] = []
+
+    @property
+    def citable_ids(self) -> set[str]:
+        """Every id a citation may legitimately point to in this run."""
+        return set(self.retrieved_chunk_ids) | set(self.referenced_ids)
+
+    def _note_ids(self, result: Any) -> None:
+        """Remember the ids in a successful tool result (for the citation check)."""
+        try:
+            rows = json.loads(result.content[0].text).get("results", [])
+        except (AttributeError, IndexError, TypeError, ValueError):
+            return
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            if row.get("chunk_id") and "text" in row and row["chunk_id"] not in self.retrieved_chunk_ids:
+                self.retrieved_chunk_ids.append(row["chunk_id"])
+            refs = [row.get(k) for k in ("source_chunk_id", "assessment_id", "source_document")]
+            refs += row.get("citations", []) if isinstance(row.get("citations"), list) else []
+            for ref in refs:
+                if isinstance(ref, str) and ref and ref not in self.referenced_ids:
+                    self.referenced_ids.append(ref)
 
     @property
     def degraded(self) -> bool:
@@ -188,6 +222,8 @@ class McpToolbox:
                         break
 
             status, error = _envelope_of(result)
+            if status == "ok":
+                self._note_ids(result)
             if status == "unavailable":
                 self._note_degraded(error or f"{request.name}: unavailable")
             duration_ms = round((time.perf_counter() - started) * 1000, 1)
@@ -221,6 +257,29 @@ class McpToolbox:
             text = raw.content[0].text if raw.content else "tool error"
             return ToolResult.fail("error", text)
         return ToolResult.model_validate_json(raw.content[0].text)
+
+    async def read_resource(self, uri: str) -> ToolResult:
+        """Read an MCP resource, e.g. "nfs://requirements/security" or "nfs://documents/<doc_id>".
+        Returns the same envelope as the tools; failures come back as "unavailable"/"error"."""
+        return await _read_resource(self._session, uri)
+
+    async def get_prompt(self, name: str, arguments: dict[str, Any]) -> str:
+        """Render a server prompt, e.g. get_prompt("specialist_brief", {"domain": "security",
+        "vendor_name": "Asteria AI Systems"}), as plain text for a system prompt."""
+        return await _get_prompt(self._session, name, arguments)
+
+
+async def _read_resource(session: ClientSession, uri: str) -> ToolResult:
+    try:
+        response = await session.read_resource(uri)
+        return ToolResult.model_validate_json(response.contents[0].text)
+    except Exception as exc:  # noqa: BLE001 -- unknown URI or transport failure: report, do not crash
+        return ToolResult.fail("unavailable", f"resource {uri}: {type(exc).__name__}: {exc}")
+
+
+async def _get_prompt(session: ClientSession, name: str, arguments: dict[str, Any]) -> str:
+    response = await session.get_prompt(name, {k: str(v) for k, v in arguments.items()})
+    return "\n\n".join(m.content.text for m in response.messages if getattr(m.content, "text", None))
 
 
 @asynccontextmanager

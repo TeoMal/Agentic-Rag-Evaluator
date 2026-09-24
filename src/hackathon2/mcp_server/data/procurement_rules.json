@@ -1,0 +1,27 @@
+{
+  "_status": "Approval rules from knowledge/procurement-policy.pdf (PR-001). Used by get_approval_requirements. No budget exists in the knowledge pack, so none is invented.",
+  "approval_thresholds": [
+    {"up_to_annual_value": 25000, "approvers": ["Business owner", "Procurement"],
+     "section": "PR-001 s2.1", "source_chunk_id": "procurement-policy#s2#c1"},
+    {"up_to_annual_value": 100000, "approvers": ["Business owner", "Procurement", "Finance"],
+     "section": "PR-001 s2.2", "source_chunk_id": "procurement-policy#s2#c1"},
+    {"up_to_annual_value": null, "approvers": ["Business owner", "Procurement", "Finance", "Technology Investment Committee"],
+     "section": "PR-001 s2.3", "source_chunk_id": "procurement-policy#s2#c1"}
+  ],
+  "competitive_sourcing": {
+    "above_value": 50000,
+    "rule": "Should normally include at least three comparable offers; a single-source exception requires written Procurement justification.",
+    "section": "PR-001 s5", "source_chunk_id": "procurement-policy#s5#c1"
+  },
+  "additional_approvals": [
+    {"applies_if": "confidential_or_restricted_data",
+     "approval": "Information Security approval before contract signature (security questionnaire and evidence of controls required)",
+     "section": "PR-001 s3", "source_chunk_id": "procurement-policy#s3#c1"},
+    {"applies_if": "ai_system",
+     "approval": "AI Governance review, with documented intended use, affected users, data categories, expected benefits, material risks and human oversight",
+     "section": "PR-001 s4", "source_chunk_id": "procurement-policy#s4#c1"},
+    {"applies_if": "ai_system_high_risk",
+     "approval": "High-risk AI cannot be approved solely by an automated recommendation; final approval by authorized human approvers",
+     "section": "PR-001 s4; AI-004 s6", "source_chunk_id": "procurement-policy#s4#c1"}
+  ]
+}

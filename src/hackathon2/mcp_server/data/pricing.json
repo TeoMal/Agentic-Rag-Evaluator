@@ -1,15 +1,39 @@
 {
-  "_status": "VERIFY - copy every number from knowledge/vendor-x-pricing.pdf and set source_chunk_id to the pricing chunk's real id.",
+  "_status": "Verified pricing register, copied from knowledge/vendor-x-pricing.pdf. Optional: calculate_tco also accepts prices passed explicitly (for vendors not listed here). stated_totals are the PDF's own figures -- the loader recomputes them and refuses to load if they disagree.",
   "vendors": {
     "asteria-ai-systems": {
       "currency": "EUR",
-      "tiers": [
-        {"min_seats": 1, "per_seat_monthly": 15.0}
-      ],
-      "platform_fee_yearly": 40000.0,
-      "setup_fee": 30000.0,
-      "annual_increase_pct": 0.0,
-      "source_chunk_id": "vendor-x-pricing#s2#c1"
+      "source_document": "vendor-x-pricing",
+      "per_user_monthly": 38.0,
+      "source_chunk_id": "vendor-x-pricing#s1#c1",
+      "commitment_months": 12,
+      "add_ons": {
+        "enterprise_plus": {
+          "per_user_monthly": 9.0,
+          "description": "Enterprise Plus security and governance add-on: 7-day retention, customer-managed keys, enhanced audit export",
+          "source_chunk_id": "vendor-x-pricing#s2#c1"
+        },
+        "premium_support": {
+          "annual_fee": 60000.0,
+          "description": "Optional premium support",
+          "source_chunk_id": "vendor-x-pricing#s4#c1"
+        }
+      },
+      "one_time_fees": {
+        "implementation": {"amount": 85000.0, "source_chunk_id": "vendor-x-pricing#s3#c1"}
+      },
+      "prepaid_discount": {
+        "pct": 7.0,
+        "min_months": 36,
+        "applies_to": "base_subscription",
+        "source_chunk_id": "vendor-x-pricing#s6#c1",
+        "note": "The PDF offers a 7% 'subscription discount' for a 36-month prepaid agreement; it does not say whether add-ons are included, so it is applied to the base subscription only (conservative)."
+      },
+      "stated_totals": {
+        "users": 2000,
+        "year_one_base_with_implementation": 997000.0,
+        "year_one_enterprise_plus_with_implementation": 1213000.0
+      }
     }
   }
 }
