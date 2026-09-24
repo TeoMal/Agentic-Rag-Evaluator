@@ -2,6 +2,7 @@ import json
 
 from conftest import FakeJudge
 
+from evaluation.checks import InjectionScenario
 from evaluation.judge import Judge, Judgment, prompt
 from evaluation.metrics import KNOWLEDGE_PACK, RetrievalCase, Target
 from evaluation.run import (
@@ -104,14 +105,12 @@ def test_judge_batches_calls_and_keeps_failures_in_their_slot():
     assert Judge(FakeLLM()).judge_many([]) == []
 
 
-def test_datasets_hold_31_cases_covering_the_knowledge_pack():
-    from evaluation.checks import InjectionScenario
-
+def test_datasets_hold_33_cases_covering_the_knowledge_pack():
     retrieval = load_cases("retrieval_gold.json", RetrievalCase)
     calibration = load_cases("judge_calibration.json", CalibrationCase)
     scenarios = load_cases("injection_scenarios.json", InjectionScenario)
     sample = RunRecord.load(DATASETS / "sample_run.json")
-    assert len(retrieval) + len(calibration) + len(scenarios) + len(sample.response.assessment.findings) == 31
+    assert len(retrieval) + len(calibration) + len(scenarios) + len(sample.response.assessment.findings) == 33
     assert all(s.canary in s.payload for s in scenarios)
     assert {t.doc_id for c in retrieval for t in c.relevant} == KNOWLEDGE_PACK
     assert {c.expected for c in calibration} == {"supported", "partially_supported", "unsupported", "contradicted"}

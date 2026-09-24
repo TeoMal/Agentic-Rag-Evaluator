@@ -4,8 +4,7 @@
     uv run python -m evaluation.run grounding [--record FILE]  groundedness + citation correctness (LLM)
     uv run python -m evaluation.run grounding --no-llm         code checks only: free and deterministic
     uv run python -m evaluation.run retrieval --retriever package.module:function [--k 5]
-    uv run python -m evaluation.run assessment [--record FILE]  task, tools, guardrails, injection, decision,
-                                                                latency / cost (no LLM)
+    uv run python -m evaluation.run assessment [--record FILE]  6 run-level checks (no LLM)
 
 Each run prints its gates and saves evaluation-results/<suite>-<UTC time>.json.
 Exit code: 0 all gates passed, 1 a gate failed, 2 the run could not start.

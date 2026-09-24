@@ -16,10 +16,11 @@ from pydantic import BaseModel, Field
 
 from hackathon2.schemas import Evidence, SearchHit
 
-# The supplied NFS knowledge pack (handout section 6), by doc_id.
+# The supplied NFS knowledge pack (handout section 6), by doc_id (file name without .pdf).
 KNOWLEDGE_PACK = frozenset({
     "procurement-policy", "information-security-policy", "ai-governance-policy", "vendor-risk-policy",
     "data-classification-policy", "vendor-x-proposal", "vendor-x-security-questionnaire", "vendor-x-pricing",
+    "vendor-alpha-assessment", "vendor-beta-assessment", "vendor-gamma-assessment",  # historical-vendor-assessments/
 })
 
 

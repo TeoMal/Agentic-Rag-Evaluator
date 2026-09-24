@@ -15,8 +15,7 @@ from evaluation.run import DATASETS, RunRecord
 
 
 class FakeJudge:
-    """Scripted judge. `script` maps a claim substring to (verdict, supporting block numbers,
-    or None for all blocks); other claims are "supported" by all their evidence."""
+    """Scripted judge: `script` maps claim substrings to (verdict, supporting blocks or None = all)."""
 
     model = "fake"
 

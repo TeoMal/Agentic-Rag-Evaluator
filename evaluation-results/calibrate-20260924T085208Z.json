@@ -1,12 +1,12 @@
 {
   "suite": "calibrate",
-  "created_at": "2026-09-23T16:10:52+00:00",
-  "git_commit": "b591db9c3b40",
+  "created_at": "2026-09-24T08:52:08+00:00",
+  "git_commit": "d3618e6b51f4",
   "passed": true,
   "gates": [
     {
       "metric": "accuracy",
-      "value": 0.9666666666666667,
+      "value": 1.0,
       "op": ">=",
       "threshold": 0.75,
       "passed": true
@@ -29,17 +29,13 @@
   "aggregate": {
     "cases": 10,
     "repeats": 3,
-    "accuracy": 0.9666666666666667,
-    "accuracy_min": 0.9,
+    "accuracy": 1.0,
+    "accuracy_min": 1.0,
     "false_supported": 0,
     "injection_followed": 0,
     "judge_errors": 0,
-    "misjudged": [
-      "GC-05"
-    ],
-    "unstable": [
-      "GC-05"
-    ]
+    "misjudged": [],
+    "unstable": []
   },
   "cases": [
     {
@@ -50,7 +46,9 @@
         "supported",
         "supported"
       ],
-      "tags": []
+      "tags": [
+        "corpus"
+      ]
     },
     {
       "id": "GC-02",
@@ -60,7 +58,9 @@
         "partially_supported",
         "partially_supported"
       ],
-      "tags": []
+      "tags": [
+        "corpus"
+      ]
     },
     {
       "id": "GC-03",
@@ -70,7 +70,9 @@
         "contradicted",
         "contradicted"
       ],
-      "tags": []
+      "tags": [
+        "corpus"
+      ]
     },
     {
       "id": "GC-04",
@@ -88,7 +90,7 @@
       "predicted": [
         "contradicted",
         "contradicted",
-        "unsupported"
+        "contradicted"
       ],
       "tags": []
     },

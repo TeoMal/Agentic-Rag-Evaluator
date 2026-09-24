@@ -1,5 +1,5 @@
 {
-  "description": "Retrieval relevance gold set. Labels are document-level (grade 3 = holds the answer, 2 = strong context, 1 = useful context), derived from the knowledge-pack file names in handout section 6. Once the PDFs are in knowledge/, narrow them with a 'section' prefix per target.",
+  "description": "Retrieval relevance gold set, labelled from the real knowledge pack. Targets are documents (grade 3 = holds the answer, 2 = strong context, 1 = useful context); 'note' records the sections that answer the query. Add a 'section' prefix per target once the RAG team's chunking is fixed (their headings look like '4.2 Encryption').",
   "cases": [
     {
       "id": "RET-01",
@@ -14,93 +14,132 @@
           "doc_id": "data-classification-policy",
           "grade": 2
         }
-      ]
+      ],
+      "note": "IS-010 §3 (TLS 1.2+, encryption at rest); DC-002 §3 (approved encryption mandatory)."
     },
     {
       "id": "RET-02",
       "domain": "security",
-      "query": "Does Asteria hold SOC 2 Type II or ISO 27001 certification?",
+      "query": "Does Asteria hold SOC 2 Type II or ISO 27001 certification, and were the reports provided?",
       "relevant": [
         {
           "doc_id": "vendor-x-security-questionnaire",
           "grade": 3
-        },
-        {
-          "doc_id": "vendor-x-proposal",
-          "grade": 2
         }
-      ]
+      ],
+      "note": "Questionnaire §G: both YES, reports under NDA and not included in the package."
     },
     {
       "id": "RET-03",
       "domain": "data",
-      "query": "Can confidential documents be processed by an external AI service, and under which conditions?",
+      "query": "Can confidential documents be processed by an external generative AI service, and under which conditions?",
       "relevant": [
         {
           "doc_id": "data-classification-policy",
           "grade": 3
         },
         {
-          "doc_id": "ai-governance-policy",
+          "doc_id": "information-security-policy",
           "grade": 2
+        },
+        {
+          "doc_id": "ai-governance-policy",
+          "grade": 1
         }
-      ]
+      ],
+      "note": "DC-002 §3/§5; IS-010 §6 (no training, retention > 7 days needs approval); AI-004 §2 (High tier)."
     },
     {
       "id": "RET-04",
       "domain": "procurement",
-      "query": "What approvals and how many competing quotes are required for a multi-year software contract?",
+      "query": "Which approvals and how many competing offers are required for a purchase above EUR 100,000?",
       "relevant": [
         {
           "doc_id": "procurement-policy",
           "grade": 3
+        },
+        {
+          "doc_id": "vendor-x-pricing",
+          "grade": 1
         }
-      ]
+      ],
+      "note": "PR-001 §2.3 and §5; the pricing sheet §7 restates the implication."
     },
     {
       "id": "RET-05",
       "domain": "procurement",
-      "query": "What is Asteria's per-user licence price and the total cost for 2,000 seats?",
+      "query": "What is Asteria's per-user price and the year-one total for 2,000 users?",
       "relevant": [
         {
           "doc_id": "vendor-x-pricing",
           "grade": 3
-        },
-        {
-          "doc_id": "vendor-x-proposal",
-          "grade": 1
         }
-      ]
+      ],
+      "note": "Pricing §1 (EUR 38/user/month) and §5 (year-one totals)."
     },
     {
       "id": "RET-06",
       "domain": "legal",
-      "query": "Which contract clauses are mandatory: right to audit, liability caps, data processing agreement?",
+      "query": "What must a vendor do about subprocessors, and has Asteria provided its subprocessor list?",
+      "relevant": [
+        {
+          "doc_id": "information-security-policy",
+          "grade": 3
+        },
+        {
+          "doc_id": "vendor-x-security-questionnaire",
+          "grade": 3
+        }
+      ],
+      "note": "IS-010 §7; questionnaire §F (list available under NDA, not included)."
+    },
+    {
+      "id": "RET-07",
+      "domain": "ai_governance",
+      "query": "Will Asteria use NFS prompts or documents to train its models, and what does NFS policy require?",
+      "relevant": [
+        {
+          "doc_id": "vendor-x-proposal",
+          "grade": 3
+        },
+        {
+          "doc_id": "vendor-x-security-questionnaire",
+          "grade": 2
+        },
+        {
+          "doc_id": "data-classification-policy",
+          "grade": 3
+        },
+        {
+          "doc_id": "information-security-policy",
+          "grade": 2
+        }
+      ],
+      "note": "Proposal §3; questionnaire E1; DC-002 §5 (no provider training); IS-010 §6."
+    },
+    {
+      "id": "RET-08",
+      "domain": "decision",
+      "query": "How must missing evidence and unresolved control gaps affect the decision, and how did NFS handle such gaps for earlier vendors?",
       "relevant": [
         {
           "doc_id": "vendor-risk-policy",
           "grade": 3
         },
         {
-          "doc_id": "procurement-policy",
+          "doc_id": "vendor-alpha-assessment",
           "grade": 2
-        }
-      ]
-    },
-    {
-      "id": "RET-07",
-      "domain": "ai_governance",
-      "query": "May an AI vendor train its models on NFS data, and does Asteria do so?",
-      "relevant": [
-        {
-          "doc_id": "ai-governance-policy",
-          "grade": 3
         },
         {
-          "doc_id": "vendor-x-proposal",
-          "grade": 3
+          "doc_id": "vendor-beta-assessment",
+          "grade": 2
+        },
+        {
+          "doc_id": "vendor-gamma-assessment",
+          "grade": 2
         }
-      ]
+      ],
+      "note": "VR-006 §2-4; historical records Alpha (72h -> 24h, conditional), Beta (retention, reject), Gamma (SOC 2 UNKNOWN, conditional pilot). Needs several documents together."
     }
   ]
 }

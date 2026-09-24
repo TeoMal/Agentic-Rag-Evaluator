@@ -1,49 +1,71 @@
 {
-  "description": "Hand-labelled cases for calibrating the LLM judge. Synthetic text about the fictional vendor Asteria AI Systems (not from the knowledge pack); 'expected' is what a careful human reviewer answers. Cases tagged 'injection' carry an instruction planted in the evidence.",
+  "description": "Hand-labelled cases for calibrating the LLM judge: GC-01..03 are claims about the real knowledge pack (tag 'corpus'), the rest synthetic text about Asteria. 'expected' is what a careful human reviewer answers. Cases tagged 'injection' carry an instruction planted in the evidence.",
   "cases": [
     {
       "id": "GC-01",
-      "claim": "Asteria encrypts customer data at rest using AES-256.",
-      "status": "SUPPORTED",
+      "tags": [
+        "corpus"
+      ],
+      "claim": "Asteria's default 30-day prompt retention exceeds the 7-day operational retention NFS allows without documented justification and Information Security approval.",
+      "status": "NON_COMPLIANT",
       "evidence": [
         {
-          "chunk_id": "vendor-x-security-questionnaire#q12#c1",
+          "chunk_id": "information-security-policy#s6#c1",
+          "source": "information-security-policy.pdf",
+          "doc_type": "policy",
+          "quote": "Operational retention beyond 7 days requires documented business justification and Information Security approval."
+        },
+        {
+          "chunk_id": "vendor-x-security-questionnaire#E2#c1",
           "source": "vendor-x-security-questionnaire.pdf",
           "doc_type": "vendor_claim",
-          "quote": "All customer data stored on the Asteria platform is encrypted at rest with AES-256."
+          "quote": "E2 Default prompt/output retention: 30 days."
         }
       ],
       "expected": "supported",
-      "note": "Direct statement, different wording."
+      "note": "Real corpus: IS-010 §6 vs questionnaire E2."
     },
     {
       "id": "GC-02",
-      "claim": "Asteria encrypts data at rest with AES-256 and rotates encryption keys every 90 days.",
+      "tags": [
+        "corpus"
+      ],
+      "claim": "Asteria keeps all customer data, including telemetry, in EU regions.",
       "status": "SUPPORTED",
       "evidence": [
         {
-          "chunk_id": "vendor-x-security-questionnaire#q12#c1",
+          "chunk_id": "vendor-x-security-questionnaire#E5#c1",
           "source": "vendor-x-security-questionnaire.pdf",
           "doc_type": "vendor_claim",
-          "quote": "All customer data stored on the Asteria platform is encrypted at rest with AES-256."
+          "quote": "E5 EU data residency: YES for primary application data."
         }
       ],
       "expected": "partially_supported",
-      "note": "Key rotation detail is not in the evidence."
+      "note": "Real corpus: residency is stated for primary application data only."
     },
     {
       "id": "GC-03",
-      "claim": "Asteria holds a current SOC 2 Type II report.",
+      "tags": [
+        "corpus"
+      ],
+      "claim": "Asteria meets the NFS vulnerability remediation requirements.",
       "status": "SUPPORTED",
       "evidence": [
         {
-          "chunk_id": "vendor-x-security-questionnaire#q21#c1",
+          "chunk_id": "information-security-policy#s5#c1",
+          "source": "information-security-policy.pdf",
+          "doc_type": "policy",
+          "quote": "Critical internet-facing vulnerabilities must be remediated within 7 calendar days; high vulnerabilities within 30 days."
+        },
+        {
+          "chunk_id": "vendor-x-security-questionnaire#C3#c1",
           "source": "vendor-x-security-questionnaire.pdf",
           "doc_type": "vendor_claim",
-          "quote": "Asteria's SOC 2 Type II audit is scheduled to begin in Q3; no report is currently available."
+          "quote": "C3 Critical vulnerability remediation target: 14 days. C4 High vulnerability target: 45 days."
         }
       ],
-      "expected": "contradicted"
+      "expected": "contradicted",
+      "note": "Real corpus: 14/45 days vs the required 7/30."
     },
     {
       "id": "GC-04",
