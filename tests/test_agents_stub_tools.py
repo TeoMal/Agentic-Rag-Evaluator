@@ -5,6 +5,9 @@ import pytest
 from hackathon2.agents.stub_tools import CORPUS, REQUIREMENTS, VENDOR_ID, build_stub_tools
 from hackathon2.schemas import RequirementControl, TCOResult, ToolResult
 
+CORVID = "corvid-document-ai"
+INVENTED_DOCS = {"vendor-y-proposal", "vendor-y-security-questionnaire", "vendor-y-pricing"}
+
 
 def _tools(**kwargs):
     return {tool.name: tool for tool in build_stub_tools(**kwargs)}
@@ -29,7 +32,7 @@ def test_exposes_every_contract_tool():
 
 
 def test_corpus_covers_the_whole_knowledge_pack():
-    assert {c.doc_id for c in CORPUS} == {
+    assert {c.doc_id for c in CORPUS} - INVENTED_DOCS == {
         "vendor-risk-policy",
         "information-security-policy",
         "data-classification-policy",
@@ -124,3 +127,27 @@ def test_unavailable_backend_is_reported_not_raised():
     tools = _tools(unavailable=["search_policy"])
     assert _call(tools["search_policy"], query="encryption").status == "unavailable"
     assert _call(tools["get_budget"], category="ai_platform").status == "ok"
+
+
+def test_no_budget_is_simulated():
+    # A budget figure picked here would decide the budget finding in advance.
+    result = _call(_tools()["get_budget"], category="ai_platform")
+    assert result.status == "ok" and result.results == []
+
+
+def test_invented_vendor_is_isolated_from_the_knowledge_pack_vendor():
+    tools = _tools()
+    corvid = _call(tools["search_vendor_documents"], query="shared admin accounts", vendor_id=CORVID)
+    assert corvid.hits() and all(h.doc_id.startswith("vendor-y-") for h in corvid.hits())
+    asteria = _call(tools["search_vendor_documents"], query="shared admin accounts", vendor_id=VENDOR_ID)
+    assert all(h.doc_id.startswith("vendor-x-") for h in asteria.hits())
+
+
+def test_tco_works_for_any_vendor_with_pricing_data():
+    result = _call(_tools()["calculate_tco"], vendor_id=CORVID, seats=400, years=2)
+    (offer,) = (TCOResult.model_validate(r) for r in result.results)  # no optional extras
+    assert offer.total == pytest.approx(55 * 12 * 400 * 2 + 20_000)
+
+
+def test_tco_for_unknown_vendor_is_an_error_not_a_guess():
+    assert _call(_tools()["calculate_tco"], vendor_id="nobody", seats=10, years=1).status == "error"

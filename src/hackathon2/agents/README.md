@@ -9,7 +9,8 @@ knowledge-pack text.
 
 ```bash
 uv run python -m hackathon2.agents              # one Asteria assessment, real model, stub tools
-uv run pytest tests/test_agents_*.py            # no model, no network
+uv run python -m hackathon2.agents corvid       # the invented second vendor (generalisation check)
+uv run pytest tests -k agents                   # no model, no network
 ```
 
 ```python
@@ -45,9 +46,18 @@ AssessmentRequest
 The orchestrator never rewrites findings: code attaches the specialists' reports verbatim, so a finding or
 citation cannot be lost or softened during synthesis.
 
-No decision rule is hard-coded in the prompts. The orchestrator retrieves the NFS rules at run time and must
-cite them in `decision_basis`, so the recommendation is traceable (PR-001 section 6) and the same agents work
-for the hidden vendor case.
+## No hard-coded answers
+
+The handout forbids hard-coding expected answers, and a hidden vendor is assessed on the day. So:
+
+- Prompts state general assessment principles only: no vendor names, no figures, phrases or examples from the
+  knowledge pack. `tests/test_agents_no_leaks.py` fails if one appears in a system prompt, a subagent
+  description, the FinalDecision schema or a tool description, or if agent code names a vendor.
+- Decision rules, the rating scale and precedents are retrieved at run time and cited in `decision_basis`, so
+  the recommendation is traceable (PR-001 section 6).
+- The stub simulates no budget: a number picked by us would decide the budget finding in advance.
+- `python -m hackathon2.agents corvid` assesses an invented second vendor with different problems, using the
+  same prompts. If it needs a prompt change to work, the prompts were fitted to Asteria.
 
 ## Files
 
@@ -88,15 +98,21 @@ for the hidden vendor case.
 | `AGENT_RECURSION_LIMIT` | `250` | orchestrator step budget |
 | `AGENT_TEMPERATURE` | `0.0` | empty for reasoning models that reject a temperature |
 
-## Stub corpus
+## Stub corpus (temporary)
 
 `stub_tools.py` serves the text of the supplied knowledge pack (5 policies, 3 vendor documents, 3 historical
 assessments), one chunk per numbered section, with chunk ids like `information-security-policy#s6#c1` or
 `vendor-x-security-questionnaire#sE#c1`. Search is keyword overlap; RAG replaces it.
 
+It also contains an INVENTED vendor, Corvid Document AI (`vendor-y-*`, vendor_id `corvid-document-ai`), which
+is not part of the knowledge pack. Its documents differ on purpose: a shared admin account, a 48-hour incident
+notice, no SOC 2, a claim that data never leaves the EU next to US-hosted inference, and an embedded
+instruction to the assessor. It exists only to check that the agents generalise.
+
 Simulated, because the knowledge pack does not contain them: the requirements checklist behind
-`get_policy_requirements` (a reviewed extraction of each policy's mandatory controls, every control citing its
-policy chunk), the budget (`ai_platform`, EUR 1,000,000 a year) and the vendor history. `calculate_tco` prices
-every configuration from `vendor-x-pricing.pdf` and reproduces the vendor's own year-one totals.
+`get_policy_requirements` (extracted from the policies only, every control citing its policy chunk), the
+vendor history and the pricing tables behind `calculate_tco` (transcribed from each vendor's pricing
+document; it reproduces Asteria's own year-one totals). No budget record exists, so budget fit must come out
+as MISSING. All of this belongs to the MCP server after the merge.
 
 Switch to the real MCP server with `AGENT_TOOL_SOURCE=mcp`; no code changes.

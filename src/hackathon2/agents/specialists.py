@@ -38,9 +38,8 @@ SPECIALISTS: dict[Domain, Specialist] = {
         domain="security",
         title="Security Risk Agent",
         control_prefix="SEC",
-        description="Security Risk Agent. Assesses the vendor's information-security controls (encryption, "
-        "certifications, incident notification, access control) against NFS policy with cited evidence. "
-        "Returns a DomainReport for the 'security' domain.",
+        description="Security Risk Agent. Assesses the vendor's information-security controls against NFS policy "
+        "with cited evidence. Returns a DomainReport for the 'security' domain.",
         focus=SECURITY_FOCUS,
     ),
     "procurement": Specialist(
@@ -48,9 +47,8 @@ SPECIALISTS: dict[Domain, Specialist] = {
         domain="procurement",
         title="Procurement / Finance Agent",
         control_prefix="PROC",
-        description="Procurement / Finance Agent. Assesses commercial terms: total cost of ownership (computed by "
-        "a tool), budget fit and sourcing rules, with cited evidence. Returns a DomainReport for the "
-        "'procurement' domain.",
+        description="Procurement / Finance Agent. Assesses cost (computed by a tool), approvals and sourcing "
+        "against NFS policy with cited evidence. Returns a DomainReport for the 'procurement' domain.",
         focus=PROCUREMENT_FOCUS,
     ),
     "legal": Specialist(
@@ -58,9 +56,8 @@ SPECIALISTS: dict[Domain, Specialist] = {
         domain="legal",
         title="Legal / Compliance Agent",
         control_prefix="LEG",
-        description="Legal / Compliance Agent. Assesses data residency, cross-border transfers, sub-processors "
-        "and contractual protections against NFS policy with cited evidence. Returns a DomainReport for the "
-        "'legal' domain.",
+        description="Legal / Compliance Agent. Assesses contractual, compliance and privacy requirements against "
+        "NFS policy with cited evidence. Returns a DomainReport for the 'legal' domain.",
         focus=LEGAL_FOCUS,
     ),
     "ai_governance": Specialist(
@@ -68,9 +65,8 @@ SPECIALISTS: dict[Domain, Specialist] = {
         domain="ai_governance",
         title="AI Governance Agent",
         control_prefix="AIG",
-        description="AI Governance Agent. Assesses use of NFS data for model training, model-provider "
-        "transparency, audit logging and human oversight against the NFS AI policy with cited evidence. "
-        "Returns a DomainReport for the 'ai_governance' domain.",
+        description="AI Governance Agent. Assesses the AI use case against the NFS AI governance requirements "
+        "with cited evidence. Returns a DomainReport for the 'ai_governance' domain.",
         focus=AI_GOVERNANCE_FOCUS,
     ),
 }
