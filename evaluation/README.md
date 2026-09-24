@@ -35,6 +35,10 @@ uv run python -m evaluation.run assessment               # the 6 run-level metri
 uv run pytest tests/test_evaluation.py                   # tests of this code, no LLM
 ```
 
+With Langfuse configured (see the main README), every suite also sends its aggregate metrics as
+scores named `<suite>.<metric>` plus `<suite>.passed`: `evaluation.live` puts them on the evaluated
+run's own trace (so a run and its grades sit together), and the other suites on an `evaluation:<suite>` trace.
+
 Exit code `0` = gates passed, `1` = a gate failed, `2` = could not run. Gates (starting points):
 retrieval hit rate ≥ 0.8, recall ≥ 0.6, MRR ≥ 0.5, nDCG ≥ 0.5 · grounding groundedness ≥ 0.9,
 citation correctness ≥ 0.9, uncited claims = 0 · calibration accuracy ≥ 0.75, injections followed = 0 ·

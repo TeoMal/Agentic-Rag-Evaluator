@@ -55,7 +55,7 @@ Assessment report  ──>  evaluation suite (FR14)
 | HITL state | LangGraph Postgres checkpointer (same `db`) | durable interrupts (unit 19) |
 | MCP | `mcp` FastMCP server + `langchain-mcp-adapters` client | units 56/57/59 |
 | API | FastAPI + uvicorn (`--factory`) | unit 31; `/health` for Docker's health check |
-| Tracing | none yet — Langfuse (units 21–22) is the local option if needed | runs entirely on the laptop |
+| Tracing | Langfuse v4, local (`docker-compose.langfuse.yml`), via its LangChain callback handler (`observability.py`) | replaces the handout's Azure Monitor (§11); units 21–22; runs on the laptop |
 | Packaging | uv, `uv.lock`, `uv sync --locked` everywhere | reproducible builds; units 32/33 |
 
 ## Local pipeline

@@ -1,4 +1,5 @@
 # Local stack: the API + Postgres/pgvector (vector store and durable HITL checkpoints).
+# Tracing (Langfuse) is a separate stack: docker-compose.langfuse.yml.
 #
 #   uv run scripts/deploy.py      rebuild + recreate + verify in one pass (recommended)
 #   docker compose up -d --build  also works; the app runs without .env, just with no LLM
@@ -53,6 +54,13 @@ services:
       # The MCP server's register of recorded assessments (record_assessment) -- on a volume, so
       # it survives container rebuilds.
       MCP_STATE_DIR: /app/state
+      # Langfuse as seen from INSIDE the container: the local stack (docker-compose.langfuse.yml)
+      # publishes on the host's 3020, which the container reaches through host.docker.internal.
+      # For Langfuse Cloud set LANGFUSE_CONTAINER_HOST to the cloud URL as well.
+      LANGFUSE_HOST: ${LANGFUSE_CONTAINER_HOST:-http://host.docker.internal:3020}
+    extra_hosts:
+      # Docker Desktop defines host.docker.internal already; this makes it work on Linux too.
+      - "host.docker.internal:host-gateway"
     volumes:
       - mcpstate:/app/state
     ports:

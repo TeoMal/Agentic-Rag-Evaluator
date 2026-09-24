@@ -6,7 +6,9 @@
     uv run python -m evaluation.run retrieval --retriever package.module:function [--k 5]
     uv run python -m evaluation.run assessment [--record FILE]  6 run-level checks (no LLM)
 
-Each run prints its gates and saves evaluation-results/<suite>-<UTC time>.json.
+Each run prints its gates and saves evaluation-results/<suite>-<UTC time>.json. With Langfuse
+configured, the results are also sent as scores: on the evaluated run's own trace when the run record
+carries one (a live run), otherwise on a trace named "evaluation:<suite>".
 Exit code: 0 all gates passed, 1 a gate failed, 2 the run could not start.
 """
 
@@ -28,6 +30,7 @@ from pydantic import BaseModel, Field
 from evaluation import checks
 from evaluation.judge import Judge, Judgment, Verdict
 from evaluation.metrics import RetrievalCase, citation_problems, rank_scores
+from hackathon2 import observability
 from hackathon2.llm import LLMNotConfiguredError
 from hackathon2.schemas import CITATION_REQUIRED, AssessmentResponse, Evidence, EvidenceStatus, SearchHit, ToolResult
 
@@ -78,6 +81,11 @@ class RunRecord(BaseModel):
     retrieved_hits: list[SearchHit] = Field(default_factory=list)
     expected: dict | None = Field(default=None, description="Optional gold decision: recommendation / risk_rating.")
     required_controls: list[str] | None = Field(default=None, description="Mandatory control ids the run had to cover.")
+
+    @property
+    def trace_id(self) -> str | None:
+        """The run's Langfuse trace, when it was traced."""
+        return self.response.metrics.trace_id if self.response.metrics else None
 
     @classmethod
     def load(cls, path: Path) -> RunRecord:
@@ -298,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-save", action="store_true", help="print only, do not write evaluation-results/")
     args = parser.parse_args(argv)
 
+    trace_id = None
     try:
         if args.suite == "retrieval":
             if not args.retriever:
@@ -307,9 +316,13 @@ def main(argv: list[str] | None = None) -> int:
             report = evaluate_retrieval(retriever, load_cases("retrieval_gold.json", RetrievalCase), args.k)
         elif args.suite == "assessment":
             scenarios = load_cases("injection_scenarios.json", checks.InjectionScenario)
-            report = evaluate_assessment(RunRecord.load(args.record), scenarios)
+            record = RunRecord.load(args.record)
+            trace_id = record.trace_id
+            report = evaluate_assessment(record, scenarios)
         elif args.suite == "grounding":
-            report = evaluate_grounding(RunRecord.load(args.record), None if args.no_llm else Judge.from_settings())
+            record = RunRecord.load(args.record)
+            trace_id = record.trace_id
+            report = evaluate_grounding(record, None if args.no_llm else Judge.from_settings())
         else:
             cases = load_cases("judge_calibration.json", CalibrationCase)
             report = evaluate_calibration(Judge.from_settings(), cases, args.repeat)
@@ -317,11 +330,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 2
 
-    return 0 if finish(args.suite, report, save_results=not args.no_save) else 1
+    passed = finish(args.suite, report, save_results=not args.no_save, trace_id=trace_id)
+    observability.get_tracer().flush()
+    return 0 if passed else 1
 
 
-def finish(suite: str, report: dict, *, save_results: bool = True) -> bool:
-    """Print a suite's aggregate and gates, save it, and say whether every gate passed."""
+def finish(suite: str, report: dict, *, save_results: bool = True, trace_id: str | None = None) -> bool:
+    """Print a suite's aggregate and gates, save it, send it to Langfuse (when configured) and say
+    whether every gate passed. trace_id: the evaluated run's trace, to score it in place."""
     gates = check_gates(suite, report["aggregate"])
     print(f"== evaluation: {suite} ==\n{json.dumps(report['aggregate'], indent=2)}\n")
     for g in gates:
@@ -332,6 +348,10 @@ def finish(suite: str, report: dict, *, save_results: bool = True) -> bool:
     print(f"\n[{'PASS' if passed else 'FAIL'}] {suite}")
     if save_results:
         print(f"results: {save(suite, report, gates)}")
+    tracer = observability.get_tracer()
+    scored = tracer.record_evaluation(suite, report["aggregate"], gates, passed, trace_id=trace_id)
+    if scored:
+        print(f"langfuse: {tracer.trace_url(scored) or scored}")
     return passed
 
 

@@ -8,6 +8,7 @@
 Each run goes through the AssessmentRunner (real model, MCP server, RAG, decision gate); its record --
 response, every retrieved chunk with its text, the mandatory controls -- is saved to
 evaluation-results/run-<assessment_id>.json and scored by the `assessment` and `grounding` suites.
+With Langfuse configured, each run is traced and both suites' scores land on that run's trace.
 One run has only a dozen or so material findings, so a single finding moves groundedness by ~7 points:
 with --runs N the gates are judged on the mean, saved as live-summary-<time>.json.
 Exit code: 0 all gates passed, 1 a gate failed, 2 the run could not start.
@@ -32,6 +33,7 @@ from evaluation.run import (
     load_cases,
     save,
 )
+from hackathon2 import observability
 from hackathon2.agents.runner import AssessmentRunner
 from hackathon2.llm import LLMNotConfiguredError
 from hackathon2.schemas import AssessmentRequest
@@ -102,11 +104,12 @@ def main(argv: list[str] | None = None) -> int:
         path.write_text(record.model_dump_json(indent=2) + "\n", encoding="utf-8")
         print(f"run record: {path} (status {record.response.status})\n")
         assessment, grounding = evaluate_assessment(record, scenarios), evaluate_grounding(record, judge)
-        passed = finish("assessment", assessment) and passed
-        passed = finish("grounding", grounding) and passed
+        passed = finish("assessment", assessment, trace_id=record.trace_id) and passed
+        passed = finish("grounding", grounding, trace_id=record.trace_id) and passed
         runs.append(
             {**assessment["aggregate"], **grounding["aggregate"], "assessment_id": record.response.assessment_id}
         )
+    observability.get_tracer().flush()
     if args.runs == 1:
         return 0 if passed else 1
 

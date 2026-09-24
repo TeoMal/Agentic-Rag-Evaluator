@@ -8,6 +8,8 @@
     uv run scripts/deploy.py                   test, rebuild image, recreate container, verify
     uv run scripts/deploy.py status            what is running, and which image it is
     uv run scripts/deploy.py down [--volumes]  stop the local stack
+    uv run scripts/deploy.py langfuse          start local Langfuse (tracing UI on :3020)
+    uv run scripts/deploy.py langfuse-down     stop it (traces are kept)
 
 Flags: --tag TAG  --skip-tests  --no-cache  --dry-run  --yes  --timeout SECONDS
 
@@ -49,6 +51,14 @@ IMAGE_NAME = "hackathon2-app"
 APP_SERVICE = "app"
 DB_SERVICE = "db"
 COMPOSE = ["docker", "compose", "--project-directory", str(ROOT), "-f", str(ROOT / "docker-compose.yml")]
+# Langfuse is its own Compose project, so `down --volumes` never deletes the traces.
+LANGFUSE_COMPOSE = [
+    "docker", "compose", "--project-directory", str(ROOT), "-f", str(ROOT / "docker-compose.langfuse.yml"),
+]
+LANGFUSE_URL = "http://localhost:3020"
+LANGFUSE_LOGIN = "admin@hackathon2.local / hackathon2-langfuse"
+# First start pulls ~2 GB of images and runs the ClickHouse migrations.
+LANGFUSE_TIMEOUT = 600
 
 # The only values with no shared default -- everything else ships in .env.example
 # (OPENAI_API_VERSION has a default in config.py).
@@ -57,12 +67,12 @@ REQUIRED_LLM_KEYS = (
     "AZURE_OPENAI_ENDPOINT",
     "AZURE_OPENAI_DEPLOYMENT_NAME",
 )
-SECRET_KEYS = {"AZURE_OPENAI_API_KEY", "POSTGRES_PASSWORD", "MCP_APPROVAL_SECRET"}
+SECRET_KEYS = {"AZURE_OPENAI_API_KEY", "POSTGRES_PASSWORD", "MCP_APPROVAL_SECRET", "LANGFUSE_SECRET_KEY"}
 # Signs human approvals for record_assessment (mcp_server/auth.py). Nobody needs to know it, so it is
 # generated into .env when missing instead of being asked for.
 APPROVAL_SECRET_KEY = "MCP_APPROVAL_SECRET"
 # Real environment variables win over .env (same rule as Compose and pydantic-settings).
-ENV_OVERRIDE_PREFIXES = ("AZURE_", "OPENAI_", "APP_", "POSTGRES_")
+ENV_OVERRIDE_PREFIXES = ("AZURE_", "OPENAI_", "APP_", "POSTGRES_", "LANGFUSE_")
 DEFAULT_APP_PORT = "8020"
 DEFAULT_TIMEOUT = 180
 DOCKER_START_TIMEOUT = 300  # a cold Docker Desktop start boots a WSL VM first
@@ -525,6 +535,8 @@ def cmd_local(args: argparse.Namespace, console: Console, runner: Runner) -> Non
     console.say(f"  Image     {IMAGE_NAME}:{tag}")
     console.say(f"  Database  127.0.0.1:{config.get('POSTGRES_PORT', '5446')}  db={config.get('POSTGRES_DB', 'hackathon2')}")
     console.say("  Logs      docker compose logs -f app")
+    if body.get("checks", {}).get("tracing") == "langfuse":
+        console.say(f"  Tracing   {config.get('LANGFUSE_HOST', LANGFUSE_URL)}  (local stack: deploy.py langfuse)")
 
 
 def cmd_status(args: argparse.Namespace, console: Console, runner: Runner) -> None:
@@ -546,10 +558,30 @@ def cmd_down(args: argparse.Namespace, console: Console, runner: Runner) -> None
     runner.run(command)
 
 
+def cmd_langfuse(args: argparse.Namespace, console: Console, runner: Runner) -> None:
+    ensure_docker(runner, console)
+    timeout = args.timeout or LANGFUSE_TIMEOUT
+    console.step("Langfuse (docker-compose.langfuse.yml)")
+    runner.run([*LANGFUSE_COMPOSE, "up", "-d", "--wait", "--wait-timeout", str(timeout)])
+    console.say("")
+    console.say(f"  Langfuse  {LANGFUSE_URL}   login: {LANGFUSE_LOGIN}")
+    console.say("  The app traces there when .env has the LANGFUSE_* keys from .env.example.")
+
+
+def cmd_langfuse_down(args: argparse.Namespace, console: Console, runner: Runner) -> None:
+    command = [*LANGFUSE_COMPOSE, "down", "--remove-orphans"]
+    if args.volumes:
+        confirm(args, "Also delete the Langfuse volumes (every trace and score)?")
+        command.append("--volumes")
+    runner.run(command)
+
+
 COMMANDS = {
     "local": cmd_local,
     "status": cmd_status,
     "down": cmd_down,
+    "langfuse": cmd_langfuse,
+    "langfuse-down": cmd_langfuse_down,
 }
 
 
@@ -567,7 +599,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="print mutating commands instead of running them")
     parser.add_argument("-y", "--yes", action="store_true", help="skip confirmation prompts")
     parser.add_argument("--timeout", type=int, help="seconds to wait for health (default: 180)")
-    parser.add_argument("--volumes", action="store_true", help="down: also delete the database volume")
+    parser.add_argument("--volumes", action="store_true",
+                        help="down: also delete the database volume; langfuse-down: the trace volumes")
     return parser.parse_args(argv)
 
 
