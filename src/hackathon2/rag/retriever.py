@@ -146,6 +146,15 @@ class Retriever:
             self.log.record(chunks)
         return chunks
 
+    def vendor_documents(self) -> dict[str, list[str]]:
+        """Each vendor named in the file names ('x' for vendor-x-*.pdf) -> the ids of its own
+        documents (doc_type vendor_claim) in the index."""
+        documents: dict[str, set[str]] = {}
+        for chunk in self._chunks():
+            if chunk.doc_type == "vendor_claim" and chunk.vendor:
+                documents.setdefault(chunk.vendor, set()).add(chunk.doc_id)
+        return {vendor: sorted(ids) for vendor, ids in sorted(documents.items())}
+
     def _chunks(self) -> list[DocumentChunk]:
         if "chunks" not in self._lexical:
             try:
@@ -181,8 +190,7 @@ def open_retriever(
         return _open(settings, store, mode)
     if not embeddings_configured(settings):
         logger.warning(
-            "No embedding model configured (AZURE_OPENAI_EMBEDDING_DEPLOYMENT); "
-            "keyword-only (BM25) retrieval over %s",
+            "No embedding model configured (AZURE_OPENAI_EMBEDDING_DEPLOYMENT); keyword-only (BM25) retrieval over %s",
             settings.knowledge_dir,
         )
         return _open(settings, KeywordChunkStore(), "lexical")
@@ -200,9 +208,22 @@ def open_retriever(
 
 
 def _open(settings: Settings, store: ChunkStore, mode: RetrievalMode) -> Retriever:
+    """Ingest when the index is empty or no longer matches the knowledge directory -- e.g. a new
+    vendor's PDFs were added (the hidden vendor case): a persistent index would never see them."""
     if store.size() == 0:
         logger.info("Index is empty; ingesting %s", settings.knowledge_dir)
         ingest(settings, store)
+    else:
+        indexed = {chunk.source for chunk in store.all_chunks()}
+        on_disk = {path.name for path in settings.knowledge_dir.rglob("*.pdf")}
+        if indexed != on_disk:
+            logger.info(
+                "Knowledge pack changed (new: %s, removed: %s); re-ingesting %s",
+                sorted(on_disk - indexed),
+                sorted(indexed - on_disk),
+                settings.knowledge_dir,
+            )
+            ingest(settings, store)
     return Retriever(store, mode=mode)
 
 

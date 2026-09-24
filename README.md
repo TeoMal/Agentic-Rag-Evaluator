@@ -80,6 +80,21 @@ Every run is logged to `logs/deploy-NNNN-*.log`.
 
 Plain Docker works too: `docker compose up -d --build` (images are then tagged `dev`).
 
+## Hidden vendor case (Session D)
+
+No code or data change is needed for a new vendor:
+
+1. Put its PDFs in `knowledge/`, named like the pack: `vendor-<tag>-proposal.pdf`,
+   `vendor-<tag>-security-questionnaire.pdf`, `vendor-<tag>-pricing.pdf`.
+2. `uv run scripts/deploy.py` -- the image carries the new PDFs, and the index is rebuilt
+   automatically because the files changed.
+3. Request the assessment at **http://127.0.0.1:8020/ui** with the vendor's name. Vendors not in
+   `mcp_server/data/vendors.json` are matched to their documents by the `<tag>` or by their name
+   appearing in them -- never to another vendor's documents (then the tool says so, with the
+   candidates). Pricing comes from its pricing document (`calculate_tco` explicit mode).
+4. Score the run: save the request as JSON, then
+   `uv run python -m evaluation.live --request hidden.json`.
+
 ## Layout
 
 ```
@@ -91,7 +106,8 @@ src/hackathon2/        the service (FastAPI, uvicorn --factory)
   mcp_server/          NFS MCP server (tools, resources, prompts) + the agents' stdio client
   rag/                 ingestion + retrieval (vector, hybrid, or keyword-only without embeddings)
   guardrails/          injection scan, tool authorization, the decision gate
-tests/                 pytest: units per package + integration (API, agents <-> MCP <-> RAG)
+tests/                 ~50 essential pytest tests, one file per area: schemas, devops, api, agents,
+                       gate, guardrails, integration (agents <-> MCP <-> RAG, hidden vendor), evaluation
 evaluation/            evaluation suite (FR14) -> results in evaluation-results/
 knowledge/             the NFS knowledge pack PDFs (RAG corpus, baked into the image)
 architecture/          design + course-unit map

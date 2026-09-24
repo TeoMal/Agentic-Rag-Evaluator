@@ -50,6 +50,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `evaluation/` is a top-level folder, not part of the installed package.
+pythonpath = ["."]
 # `async def test_...` runs without a decorator on each one.
 asyncio_mode = "auto"
 addopts = "-ra"

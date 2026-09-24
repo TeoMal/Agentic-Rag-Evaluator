@@ -4,7 +4,7 @@ break a run (no keys, a broken client, or an unreachable Langfuse server)."""
 from contextlib import contextmanager
 
 from langchain_core.callbacks import BaseCallbackHandler
-from test_agents_workflow import REQUEST, ScriptedModel, _runner, _script
+from test_agents import REQUEST, ScriptedModel, _runner, _script
 
 from hackathon2.observability import NULL_TRACE, Trace, Tracer, _LiveTrace, evaluation_scores, run_scores, run_summary
 from hackathon2.schemas import AssessmentResponse, HumanDecision

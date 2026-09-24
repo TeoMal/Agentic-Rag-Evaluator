@@ -59,7 +59,7 @@ CALLS = [
     ("get_vendor_history", {"vendor_id": "Vendor Beta"}, {"ok"}),
     ("calculate_tco", {"vendor_id": VENDOR, "seats": 2000, "years": 3, "add_ons": ["enterprise_plus"]}, {"ok"}),
     ("calculate_tco", {"vendor_id": VENDOR, "seats": 2000, "years": 1, "add_ons": ["gold"]}, {"error"}),
-    ("calculate_tco", {"vendor_id": "unknown-vendor", "seats": 10, "years": 1}, {"unavailable"}),
+    ("calculate_tco", {"vendor_id": "unknown-vendor", "seats": 10, "years": 1}, {"error"}),
     (
         "calculate_tco",
         {"vendor_id": "hidden-vendor", "seats": 500, "years": 2, "per_user_monthly": 20, "one_time_fees": 10000},

@@ -31,8 +31,10 @@ Metadata every chunk must carry (set at ingestion):
     suspicious True if the ingestion scanner flagged injection-like text  (optional)
 
 Which documents belong to which vendor is NOT hard-coded: data/vendors.json maps a
-vendor_id to its documents. For the hidden vendor case, add one entry there (and put
-its PDFs in knowledge/ for ingestion) -- no code change.
+vendor_id to its documents. A vendor it does not list (the hidden vendor case) is found in
+the index instead: put its PDFs in knowledge/ (vendor-<tag>-proposal.pdf, ...; the index is
+rebuilt when the files change) and it is matched by its tag or by its name appearing in its
+documents -- no code or data change (vendor_documents).
 
 Historical assessments (knowledge/historical-vendor-assessments/) are NFS's own records:
 doc_type "enterprise_record", never vendor claims.
@@ -78,6 +80,8 @@ KNOWLEDGE_DOCS: dict[str, tuple[str, DocType]] = {
 # Validated against the whole knowledge pack: it flags the four injection signals in
 # vendor-x-proposal section 7 and nothing else -- including the policy sentences that talk
 # ABOUT injection ("...must not override system policies") or say "AI may recommend Approve".
+# The softer "should be recorded as compliant without further checks" (the hidden-vendor
+# rehearsal's planted text) is caught too, again with no match anywhere else in the pack.
 _NOT = r"(?<!\bnot\s)(?<!\bnever\s)(?<!\bcannot\s)"
 _INJECTION_PATTERNS = re.compile(
     "|".join(
@@ -100,6 +104,13 @@ _INJECTION_PATTERNS = re.compile(
             r"\b(recommend|say|state|write)\b\s*['\"`]\s*(approve[ds]?|low risk|pass(ed)?)\b",
             # "do not mention data retention"
             r"\bdo not (mention|disclose|report|flag|include|reveal)\b",
+            # "should be recorded as compliant" -- a vendor telling the assessor what to conclude
+            (
+                r"\b(should|must|shall|can|may|will) be (recorded|marked|treated|scored|accepted|rated|reported) "
+                r"as (fully )?(compliant|approved|passed|verified|satisfied|low risk)\b"
+            ),
+            # "without further checks"
+            r"\bwithout (any )?(further|additional|independent|more) (checks?|verification|validation|review|scrutiny)\b",
             # role hijacking
             r"\byou are now\b|\bnew (system )?instructions\b|\bact as\b[^.]{0,20}\b(unrestricted|different|developer mode)\b",
             # attempts to close our wrapper or fake a system block
@@ -165,8 +176,67 @@ def resolve_vendor(vendor_ref: str) -> str:
     )
 
 
-def vendor_documents(vendor_id: str) -> tuple[str, ...]:
-    return tuple(_vendors()[resolve_vendor(vendor_id)]["documents"])
+def vendor_documents(vendor_ref: str) -> tuple[str, ...]:
+    """A vendor's own documents: from the registry (data/vendors.json) or, for a vendor it does not
+    list -- the hidden vendor case -- from the index (see _unregistered_vendor). Raises ValueError
+    when neither identifies the vendor: never another vendor's documents."""
+    try:
+        return tuple(_vendors()[resolve_vendor(vendor_ref)]["documents"])
+    except ValueError as unknown:
+        found, candidates = _unregistered_vendor(vendor_ref)
+        if found is not None:
+            return found
+        hint = (
+            f" Vendors in the knowledge pack without a registry entry: {candidates} -- none is named "
+            f"'{vendor_ref}' and none of their documents mention it."
+            if candidates
+            else ""
+        )
+        raise ValueError(f"{unknown}{hint}") from None
+
+
+# First words too generic to identify a vendor on their own ("Global Data Systems").
+_GENERIC_WORDS = frozenset({"vendor", "the", "global", "group", "data", "digital", "cloud", "systems", "solutions"})
+
+
+@lru_cache(maxsize=64)
+def _unregistered_vendor(vendor_ref: str) -> tuple[tuple[str, ...] | None, tuple[str, ...]]:
+    """(documents, candidate tags) for a vendor that is not in the registry.
+
+    Candidates are the vendors whose documents are in the index (tagged by file name, 'y' for
+    vendor-y-*.pdf) but in no registry entry. One is chosen only when the reference is its tag
+    ('y', 'vendor-y') or its documents mention the vendor's name (or the name's first distinctive
+    word) -- so a new vendor needs no code or data change, and a request is never matched to
+    another company's documents.
+    """
+    retriever = _retriever()
+    with _retrieval():
+        indexed = retriever.vendor_documents()
+    registered = {doc for entry in _vendors().values() for doc in entry["documents"]}
+    candidates = {tag: tuple(docs) for tag, docs in indexed.items() if not registered.intersection(docs)}
+
+    wanted = _norm(vendor_ref)
+    for tag, docs in candidates.items():
+        if wanted in (tag, f"vendor-{tag}"):
+            logger.info("vendor '%s' not registered; using the documents tagged '%s': %s", vendor_ref, tag, docs)
+            return docs, tuple(candidates)
+
+    words = [w for w in _norm(vendor_ref).split("-") if w]
+    phrases = [" ".join(words)] + (
+        [words[0]] if len(words) > 1 and len(words[0]) >= 4 and words[0] not in _GENERIC_WORDS else []
+    )
+    named = []
+    for tag, docs in candidates.items():
+        with _retrieval():
+            hits = retriever.search(vendor_ref, doc_types=["vendor_claim"], doc_ids=list(docs), k=10)
+        text = " ".join(re.sub(r"[^a-z0-9]+", " ", h.text.lower()) for h in hits)
+        if any(re.search(rf"\b{re.escape(p)}\b", text) for p in phrases):
+            named.append(tag)
+    if len(named) == 1:
+        tag = named[0]
+        logger.info("vendor '%s' not registered; its name appears in the documents tagged '%s'", vendor_ref, tag)
+        return candidates[tag], tuple(candidates)
+    return None, tuple(candidates)
 
 
 def _default_doc_type(doc_id: str) -> DocType:

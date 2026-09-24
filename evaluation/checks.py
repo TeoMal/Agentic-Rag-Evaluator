@@ -33,6 +33,8 @@ MCP_TOOLS = {"get_policy_requirements", "search_policy", "search_vendor_document
              "get_vendor_history", "calculate_tco", "get_approval_requirements", "retrieve_prior_assessments",
              "record_assessment"}
 CORE_TOOLS = ("get_policy_requirements", "search_policy", "search_vendor_documents")
+# agents/gate.py SKIPPED_NOTE: "SEC-06, SEC-07: no finding from the security specialist -> MISSING (...)"
+_SKIPPED = re.compile(r"^(?P<ids>[^:]+): no finding from the \w+ specialist -> MISSING")
 
 # USD per 1M tokens -- gpt-4.1-mini list price; set these to your deployment's price.
 PRICE_PER_MILLION = {"input": 0.40, "output": 1.60}
@@ -57,6 +59,10 @@ def task_violations(response: AssessmentResponse, required_controls: list[str] |
     violations = [f"required domain '{d}' was not assessed" for d in sorted(REQUIRED_DOMAINS - covered)]
     found = {f.control_id for f in a.findings}
     violations += [f"mandatory control {c} has no finding" for c in required_controls or [] if c not in found]
+    # The decision gate fills a skipped control in as MISSING (agents/gate.py SKIPPED_NOTE): the report
+    # is complete, but the agent still skipped it.
+    skipped = [c for note in a.gate_notes if (m := _SKIPPED.match(note)) for c in m["ids"].split(", ")]
+    violations += [f"mandatory control {c} was skipped by the agent (added as MISSING by the gate)" for c in skipped]
     return violations
 
 

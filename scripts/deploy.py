@@ -88,7 +88,7 @@ class DeployError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Pure helpers -- unit-tested in tests/test_deploy_script.py
+# Pure helpers -- unit-tested in tests/test_devops.py
 # ---------------------------------------------------------------------------
 
 

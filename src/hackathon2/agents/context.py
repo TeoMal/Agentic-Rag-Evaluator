@@ -44,7 +44,9 @@ class RunContext:
 
     @property
     def degraded(self) -> bool:
-        return bool(self.tool_failures)
+        """A tool or source was unavailable (schemas: Assessment.degraded_mode). A call rejected as
+        invalid ("error") is recorded in tool_failures but is the agent's mistake, not a lost source."""
+        return "unavailable" in self.tool_statuses
 
     def record_tool_result(self, tool_name: str, result: ToolResult) -> None:
         self.tool_statuses.append(result.status)

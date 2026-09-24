@@ -5,8 +5,8 @@ rules, injection filtering) lives in code: the decision gate and the guardrails 
 
 No hard-coded answers (handout section 6). The prompts state general assessment principles only:
 no vendor names, no figures, phrases or examples taken from the knowledge pack. Decision rules,
-rating scales and precedents are retrieved at run time and cited. tests/test_agents_no_leaks.py
-fails if a corpus-specific phrase appears here.
+rating scales and precedents are retrieved at run time and cited. tests/test_agents.py fails if a
+vendor name or corpus-specific phrase appears here.
 """
 
 ORCHESTRATOR_PROMPT = """\
