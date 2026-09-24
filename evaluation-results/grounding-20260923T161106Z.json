@@ -1,0 +1,155 @@
+{
+  "suite": "grounding",
+  "created_at": "2026-09-23T16:11:06+00:00",
+  "git_commit": "b591db9c3b40",
+  "passed": false,
+  "gates": [
+    {
+      "metric": "groundedness",
+      "value": 0.42857142857142855,
+      "op": ">=",
+      "threshold": 0.9,
+      "passed": false
+    },
+    {
+      "metric": "citation_correctness",
+      "value": 0.5,
+      "op": ">=",
+      "threshold": 0.9,
+      "passed": false
+    },
+    {
+      "metric": "uncited_material",
+      "value": 1,
+      "op": "<=",
+      "threshold": 0,
+      "passed": false
+    }
+  ],
+  "aggregate": {
+    "material_findings": 7,
+    "groundedness": 0.42857142857142855,
+    "verdicts": {
+      "supported": 3,
+      "contradicted": 1,
+      "uncited": 1,
+      "unsupported": 2
+    },
+    "uncited_material": 1,
+    "citations": 8,
+    "citation_correctness": 0.5,
+    "citation_problems": {
+      "not_supportive": 3,
+      "misquoted": 1,
+      "fabricated": 1,
+      "source_mismatch": 1
+    },
+    "judge_errors": 0
+  },
+  "findings": [
+    {
+      "control_id": "SEC-09",
+      "status": "NON_COMPLIANT",
+      "verdict": "supported",
+      "reasoning": "Evidence [1] states NFS requires notification within 24 hours. Evidence [2] states Asteria commits to notifying customers within 72 hours. The claim that Asteria commits to 72 hours and NFS requires 24 hours is fully supported. The status label NON_COMPLIANT is also supported because the vendor's commitment does not meet the NFS requirement.",
+      "citations": [
+        {
+          "chunk_id": "information-security-policy#s7.1#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "vendor-x-security-questionnaire#q18#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-11",
+      "status": "SUPPORTED",
+      "verdict": "contradicted",
+      "reasoning": "The evidence states that Asteria's SOC 2 Type II audit is scheduled to begin in Q3 and that no report is currently available. This directly contradicts the claim that Asteria holds a current SOC 2 Type II report. Therefore, the claim is contradicted by the evidence.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#q21#c1",
+          "problems": [
+            "not_supportive"
+          ]
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-12",
+      "status": "SUPPORTED",
+      "verdict": "uncited",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "SEC-07",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "PROC-02",
+      "status": "SUPPORTED",
+      "verdict": "unsupported",
+      "reasoning": "The claim states Asteria's list price is EUR 25 per user per month with a three-year minimum term, but the evidence shows a different price (EUR 20 per user per month) and does not mention a three-year minimum term. Therefore, the evidence does not support the claim or the status label.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-pricing#p1#c1",
+          "problems": [
+            "misquoted",
+            "not_supportive"
+          ]
+        }
+      ]
+    },
+    {
+      "control_id": "AIG-02",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "Evidence [1] states that NFS requires AI vendors to commit not to use NFS data to train or improve their models, which supports the first part of the claim. Evidence [2] states that Asteria does not use customer data to train or improve its models, supporting the second part of the claim. Both parts of the claim and the status label are supported by the evidence.",
+      "citations": [
+        {
+          "chunk_id": "ai-governance-policy#s3.1#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "vendor-x-proposal#s5#c2",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "AIG-05",
+      "status": "SUPPORTED",
+      "verdict": "unsupported",
+      "reasoning": "The evidence only states the NFS policy requirement that vendors must publish model cards for all deployed models. It does not provide any information about Asteria's actual practices or whether Asteria publishes model cards for all deployed models. Therefore, the claim about Asteria is not supported by the evidence.",
+      "citations": [
+        {
+          "chunk_id": "ai-governance-policy#s9.9#c4",
+          "problems": [
+            "fabricated",
+            "not_supportive"
+          ]
+        }
+      ]
+    },
+    {
+      "control_id": "AIG-06",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence explicitly states that Asteria does not use customer data, prompts, or documents to train or improve its models, which directly supports the claim. There is no contradictory or missing detail in the evidence regarding the claim or the status label.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-proposal#s5#c2",
+          "problems": [
+            "source_mismatch"
+          ]
+        }
+      ]
+    }
+  ]
+}
