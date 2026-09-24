@@ -19,7 +19,18 @@ uv run scripts/deploy.py     # test -> rebuild image -> recreate container -> ve
 ```
 
 The first run creates `.env` from `.env.example` and asks once for `AZURE_OPENAI_API_KEY` and
-`AZURE_OPENAI_ENDPOINT`. Then open **http://127.0.0.1:8020/docs**.
+`AZURE_OPENAI_ENDPOINT`. Then open **http://127.0.0.1:8020/ui** to request an assessment, read the
+report and approve or reject it (API docs: http://127.0.0.1:8020/docs).
+
+| Endpoint | |
+|---|---|
+| `GET /ui` | web page: request form → assessment report → human review |
+| `POST /assessments` | run an assessment (FR01 → FR11); a failed run returns `status: failed` (FR14) |
+| `GET /assessments/{id}` | an assessment's current state |
+| `POST /assessments/{id}/decision` | approve / reject an assessment awaiting review (FR12) |
+| `GET /` · `GET /health` | liveness · image tag and subsystem checks |
+
+Assessments are kept in memory: restarting the app forgets them.
 
 PowerShell / bash shortcuts do the same thing: `.\scripts\deploy.ps1` · `bash scripts/deploy.sh`.
 
@@ -46,7 +57,7 @@ Plain Docker works too: `docker compose up -d --build` (images are then tagged `
 ```
 src/hackathon2/        the service (FastAPI, uvicorn --factory)
   config.py            all settings (env / .env)          llm.py       Azure OpenAI chat + embeddings
-  health.py            /health subsystem checks             service.py   API: GET /  GET /health
+  health.py            /health subsystem checks             service.py   API + /ui (static/index.html)
   agents/  rag/  mcp_server/  guardrails/                 to be built -- one package per team role
 tests/                 pytest (17 tests: config, API, deploy script)
 evaluation/            evaluation suite (FR14) -> results in evaluation-results/

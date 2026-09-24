@@ -29,4 +29,4 @@ def count_knowledge_documents(settings: Settings) -> int:
     folder = settings.knowledge_dir
     if not folder.is_dir():
         return 0
-    return sum(1 for p in folder.iterdir() if p.suffix.lower() in {".pdf", ".md", ".txt"})
+    return sum(1 for p in folder.rglob("*") if p.suffix.lower() in {".pdf", ".md", ".txt"})

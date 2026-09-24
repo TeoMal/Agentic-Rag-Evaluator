@@ -28,9 +28,11 @@ def test_health_reports_configured_llm(make_settings, llm_settings):
 def test_health_counts_only_corpus_documents(make_settings, tmp_path):
     (tmp_path / "procurement-policy.pdf").write_bytes(b"%PDF-1.4")
     (tmp_path / "vendor-x-pricing.pdf").write_bytes(b"%PDF-1.4")
+    (tmp_path / "historical-vendor-assessments").mkdir()
+    (tmp_path / "historical-vendor-assessments" / "vendor-alpha-assessment.pdf").write_bytes(b"%PDF-1.4")
     (tmp_path / ".gitkeep").write_text("")
     body = TestClient(create_app(make_settings())).get("/health").json()
-    assert body["checks"]["knowledge_documents"] == 2
+    assert body["checks"]["knowledge_documents"] == 3
 
 
 def test_unreachable_database_degrades_instead_of_failing(make_settings):
