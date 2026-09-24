@@ -1,0 +1,9 @@
+{
+  "vendor_name": "Asteria AI Systems",
+  "use_case": "Generative AI pilot for the legal team",
+  "user_count": 50,
+  "data_classification": "internal",
+  "contract_years": 1,
+  "requested_by": "legal-ops@northstar.example",
+  "notes": "Pilot only; no confidential documents are uploaded."
+}

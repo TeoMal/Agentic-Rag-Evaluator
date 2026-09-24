@@ -37,6 +37,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -328,6 +329,26 @@ def ensure_approval_secret(console: Console, runner: Runner) -> None:
     console.say(f"generated {APPROVAL_SECRET_KEY} in .env (signs human approvals; keep it private)")
 
 
+def ensure_langfuse_keys(console: Console, runner: Runner) -> None:
+    """The local Langfuse project is created with the keys in .env; generate them there when blank,
+    so they are never committed. (An existing Langfuse volume keeps the keys it was created with.)"""
+    values = parse_env(ENV_FILE.read_text(encoding="utf-8"))
+    missing = {name: prefix for name, prefix in (("LANGFUSE_PUBLIC_KEY", "pk-lf-"), ("LANGFUSE_SECRET_KEY", "sk-lf-"))
+               if not (values.get(name) or os.environ.get(name))}
+    if not missing:
+        return
+    if runner.dry_run:
+        console.say(f"[dry-run] would generate {', '.join(missing)} into .env")
+        return
+    text = ENV_FILE.read_text(encoding="utf-8")
+    for name, prefix in missing.items():
+        text = set_env_value(text, name, f"{prefix}{uuid.uuid4()}")
+    if not values.get("LANGFUSE_HOST"):
+        text = set_env_value(text, "LANGFUSE_HOST", LANGFUSE_URL)
+    ENV_FILE.write_text(text, encoding="utf-8")
+    console.say(f"generated {', '.join(missing)} in .env for the local Langfuse (keep them private)")
+
+
 def docker_running(runner: Runner) -> bool:
     # A half-started daemon accepts the connection and never answers -- without
     # a timeout this probe hangs forever and the startup deadline never fires.
@@ -560,12 +581,14 @@ def cmd_down(args: argparse.Namespace, console: Console, runner: Runner) -> None
 
 def cmd_langfuse(args: argparse.Namespace, console: Console, runner: Runner) -> None:
     ensure_docker(runner, console)
+    ensure_env_file(console)
+    ensure_langfuse_keys(console, runner)
     timeout = args.timeout or LANGFUSE_TIMEOUT
     console.step("Langfuse (docker-compose.langfuse.yml)")
     runner.run([*LANGFUSE_COMPOSE, "up", "-d", "--wait", "--wait-timeout", str(timeout)])
     console.say("")
     console.say(f"  Langfuse  {LANGFUSE_URL}   login: {LANGFUSE_LOGIN}")
-    console.say("  The app traces there when .env has the LANGFUSE_* keys from .env.example.")
+    console.say("  The app traces there with the LANGFUSE_* keys in .env (generated on the first start).")
 
 
 def cmd_langfuse_down(args: argparse.Namespace, console: Console, runner: Runner) -> None:

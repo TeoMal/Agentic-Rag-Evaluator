@@ -20,6 +20,7 @@ def get_chat_model(settings: Settings | None = None, **kwargs) -> AzureChatOpenA
             "Azure OpenAI is not configured: set AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, "
             "OPENAI_API_VERSION and AZURE_OPENAI_DEPLOYMENT_NAME (see .env.example)."
         )
+    kwargs.setdefault("max_retries", settings.llm_max_retries)
     return AzureChatOpenAI(
         azure_deployment=settings.azure_openai_deployment_name,
         azure_endpoint=settings.azure_openai_endpoint,

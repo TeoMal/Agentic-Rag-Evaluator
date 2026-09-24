@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     openai_api_version: str = DEFAULT_CHAT_API_VERSION
     azure_openai_deployment_name: str | None = None
     azure_openai_embedding_deployment: str | None = None
+    # Retries per model call on rate limits (429) and transient errors, with exponential backoff that honours
+    # Azure's Retry-After. The course deployment is shared by every team, and one run starts three specialists
+    # at once: the client's default of 2 gives up during a busy minute.
+    llm_max_retries: int = 8
     # Optional: embeddings on ANOTHER Azure OpenAI resource. AZURE_EMBEDDING_ENDPOINT may be the
     # resource URL or a full deployment URL (.../openai/deployments/<name>/embeddings?api-version=...);
     # whatever is not given comes from the chat settings above.
