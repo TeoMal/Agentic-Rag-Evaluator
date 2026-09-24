@@ -367,6 +367,7 @@ class RunMetrics(BaseModel):
     tools_called: list[str] = Field(default_factory=list, description="MCP tool names, in call order.")
     subagents_called: list[str] = Field(default_factory=list)
     retrieved_chunk_ids: list[str] = Field(default_factory=list)
+    trace_id: str | None = Field(default=None, description="The run's Langfuse trace; None when tracing is off.")
 
 
 class AssessmentResponse(BaseModel):

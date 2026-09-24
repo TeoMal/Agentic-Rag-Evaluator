@@ -15,6 +15,9 @@ Flow of run():
 
 decide() applies the human decision; an approval is recorded through recording.py.
 
+Each run is one Langfuse trace (observability.py) when tracing is configured: the LLM, tool and
+subagent calls, the outcome as scores, and later the human decision on the same trace.
+
 run() never raises for agent, tool or model failures: it returns status "failed" with the error (FR14).
 Results are kept in memory; persistence is up to the API layer.
 """
@@ -28,6 +31,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool
 
+from hackathon2 import observability
 from hackathon2.agents.collect import collect_domain_reports, missing_domain_report, subagents_called
 from hackathon2.agents.config import ALL_DOMAINS, AgentSettings, get_agent_settings
 from hackathon2.agents.context import RunContext, UsageCallback, content_to_text, instrument_tool, parse_tool_result
@@ -37,6 +41,7 @@ from hackathon2.agents.recording import record
 from hackathon2.agents.specialists import SPECIALISTS, SUBAGENT_DOMAINS
 from hackathon2.agents.tools import ToolsProvider, default_provider
 from hackathon2.llm import get_chat_model
+from hackathon2.observability import Tracer
 from hackathon2.schemas import (
     Assessment,
     AssessmentDraft,
@@ -63,8 +68,10 @@ class AssessmentRunner:
         subagent_middleware: Iterable = (),
         gate: GateFn = apply_gate,
         settings: AgentSettings | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
         self.settings = settings or get_agent_settings()
+        self._tracer = tracer or observability.get_tracer()
         self.domains: tuple[Domain, ...] = tuple(domains)
         self._model = model
         self._tools_provider = tools_provider or default_provider(self.settings)
@@ -78,6 +85,13 @@ class AssessmentRunner:
 
     async def run(self, request: AssessmentRequest) -> AssessmentResponse:
         ctx = RunContext(request=request)
+        with self._tracer.assessment(request, ctx.run_id) as trace:
+            ctx.trace_id = trace.trace_id
+            response = await self._run(request, ctx, trace.callbacks)
+            trace.finish(response)
+        return response
+
+    async def _run(self, request: AssessmentRequest, ctx: RunContext, trace_callbacks: list) -> AssessmentResponse:
         started = time.perf_counter()
         try:
             async with self._tools_provider() as raw_tools:
@@ -91,7 +105,10 @@ class AssessmentRunner:
                 )
                 state = await agent.ainvoke(
                     {"messages": [HumanMessage(render_request(request, self.domains))]},
-                    config={"recursion_limit": self.settings.recursion_limit, "callbacks": [UsageCallback(ctx)]},
+                    config={
+                        "recursion_limit": self.settings.recursion_limit,
+                        "callbacks": [UsageCallback(ctx), *trace_callbacks],
+                    },
                 )
                 controls = await self._required_controls({tool.name: tool for tool in raw_tools}, ctx)
         except Exception as exc:
@@ -168,6 +185,12 @@ class AssessmentRunner:
         )
         if decision.approved:
             await self._record(assessment, principal=decision.reviewer)
+        self._tracer.score(
+            current.metrics.trace_id if current.metrics else None,
+            "human_decision",
+            "approved" if decision.approved else "rejected",
+            data_type="CATEGORICAL",
+        )
         response = current.model_copy(
             update={"assessment": assessment, "status": "completed" if decision.approved else "rejected_by_reviewer"}
         )

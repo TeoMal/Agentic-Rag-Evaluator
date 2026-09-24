@@ -17,6 +17,7 @@ def test_health_reports_image_tag_and_subsystems(make_settings):
         "llm": "not_configured",
         "database": "not_configured",
         "knowledge_documents": 0,
+        "tracing": "not_configured",
     }
 
 

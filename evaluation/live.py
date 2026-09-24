@@ -7,6 +7,7 @@
 Runs the AssessmentRunner (real model, MCP server, RAG, decision gate), saves the run record --
 response, every retrieved chunk with its text, the mandatory controls -- to
 evaluation-results/run-<assessment_id>.json, then runs the `assessment` and `grounding` suites on it.
+With Langfuse configured, the run is traced and both suites' scores land on that same trace.
 Exit code: 0 both suites passed, 1 a gate failed, 2 the run could not start.
 """
 
@@ -18,6 +19,7 @@ from pathlib import Path
 from evaluation import checks
 from evaluation.judge import Judge
 from evaluation.run import DATASETS, RESULTS, RunRecord, evaluate_assessment, evaluate_grounding, finish, load_cases
+from hackathon2 import observability
 from hackathon2.agents.runner import AssessmentRunner
 from hackathon2.llm import LLMNotConfiguredError
 from hackathon2.schemas import AssessmentRequest
@@ -57,8 +59,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"run record: {path} (status {record.response.status})\n")
 
     scenarios = load_cases("injection_scenarios.json", checks.InjectionScenario)
-    passed = finish("assessment", evaluate_assessment(record, scenarios))
-    passed = finish("grounding", evaluate_grounding(record, judge)) and passed
+    passed = finish("assessment", evaluate_assessment(record, scenarios), trace_id=record.trace_id)
+    passed = finish("grounding", evaluate_grounding(record, judge), trace_id=record.trace_id) and passed
+    observability.get_tracer().flush()
     return 0 if passed else 1
 
 

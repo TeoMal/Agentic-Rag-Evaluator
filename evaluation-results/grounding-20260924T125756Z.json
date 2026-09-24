@@ -1,0 +1,441 @@
+{
+  "suite": "grounding",
+  "created_at": "2026-09-24T12:57:56+00:00",
+  "git_commit": "43ecb7d8a759",
+  "passed": false,
+  "gates": [
+    {
+      "metric": "groundedness",
+      "value": 0.7058823529411765,
+      "op": ">=",
+      "threshold": 0.9,
+      "passed": false
+    },
+    {
+      "metric": "citation_correctness",
+      "value": 0.8888888888888888,
+      "op": ">=",
+      "threshold": 0.9,
+      "passed": false
+    },
+    {
+      "metric": "uncited_material",
+      "value": 0,
+      "op": "<=",
+      "threshold": 0,
+      "passed": true
+    }
+  ],
+  "aggregate": {
+    "material_findings": 17,
+    "groundedness": 0.7058823529411765,
+    "verdicts": {
+      "supported": 12,
+      "partially_supported": 4,
+      "unsupported": 1
+    },
+    "uncited_material": 0,
+    "citations": 36,
+    "citation_correctness": 0.8888888888888888,
+    "citation_problems": {
+      "not_supportive": 4
+    },
+    "judge_errors": 0
+  },
+  "findings": [
+    {
+      "control_id": "SEC-01",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "Evidence [1] states that the vendor supports MFA for privileged administrators when the customer IdP enforces MFA, which directly supports the claim. Evidence [2] states the NFS requirement that administrative access must use MFA, which aligns with the claim's reference to meeting the NFS requirement. There is no contradictory or missing information regarding the claim or the status label.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sA#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s2#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-02",
+      "status": "SUPPORTED",
+      "verdict": "partially_supported",
+      "reasoning": "Evidence [1] states the vendor supports role-based access control (RBAC), does not allow shared production admin accounts, but does not explicitly mention logging privileged access. Evidence [2] states the NFS policy requires privileged access to be role-based, logged, and reviewed, and prohibits shared admin accounts, but it does not confirm the vendor's compliance. Therefore, the claim that the vendor supports RBAC and prohibits shared admin accounts is supported, but the claim that the vendor logs privileged access is not explicitly supported by the vendor's evidence.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sA#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s2#c1",
+          "problems": [
+            "not_supportive"
+          ]
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-03",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "Evidence [1] states that the vendor uses TLS 1.2+ for data in transit and AES-256 for data at rest, which matches the claim about the vendor's encryption practices. Evidence [2] states the NFS policy requiring TLS 1.2+ and industry-standard encryption at rest but does not confirm the vendor's compliance, only the requirement. Therefore, the claim about the vendor's practices is supported by evidence [1], and the status label 'SUPPORTED' is appropriate.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sB#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s3#c1",
+          "problems": [
+            "not_supportive"
+          ]
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-04",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "Evidence [1] explicitly states that the vendor provides centralized logging and 24x7 security monitoring, which directly supports the claim. Evidence [2] is a policy stating what NFS requires but does not provide information about the vendor's practices, so it does not support or contradict the claim. Therefore, the claim and the status label 'SUPPORTED' are backed by the vendor's own statement in evidence [1].",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sC#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s4#c1",
+          "problems": [
+            "not_supportive"
+          ]
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-05",
+      "status": "NON_COMPLIANT",
+      "verdict": "supported",
+      "reasoning": "Evidence [1] states the vendor contract requires incident notification within 72 hours, which is longer than the NFS policy in evidence [2] that requires notification within 24 hours. This supports the claim that the vendor's contract notification time exceeds NFS's requirement. The status label NON_COMPLIANT is also supported because the vendor's contract does not meet the 24-hour requirement.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sD#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s4#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-06",
+      "status": "NON_COMPLIANT",
+      "verdict": "supported",
+      "reasoning": "The vendor states it targets 14 days for critical and 45 days for high vulnerability remediation, which is slower than NFS's stricter requirements of 7 days for critical and 30 days for high. Therefore, the vendor does not meet NFS's requirements, supporting the NON_COMPLIANT status label.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sC#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s5#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-07",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "Evidence [1] states that the vendor does not use customer content for model training for enterprise tenants, which directly supports the claim. Evidence [2] states the NFS requirement that content must not be used for model training, which aligns with the claim's requirement. Therefore, the claim and the status label 'SUPPORTED' are backed by the evidence.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sE#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s6#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-08",
+      "status": "NON_COMPLIANT",
+      "verdict": "supported",
+      "reasoning": "The vendor documents (evidence 1 and 2) state that the default retention is 30 days, a 7-day retention is only available on the costly Enterprise Plus plan, and zero retention is not yet available but planned for the future. The NFS policy (evidence 3) requires retention beyond 7 days to have justification and approval, implying a 7-day max retention is the standard. Therefore, the claim that the vendor's default retention is 30 days, 7-day retention is only on Enterprise Plus, zero retention is not available, and this violates the NFS 7-day max retention policy is supported. The status label NON_COMPLIANT is also supported as the vendor does not meet the 7-day max retention requirement.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-proposal#s4#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sE#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s6#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-09",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sF#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "information-security-policy#s7#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-10",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sG#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SEC-INTEGRITY",
+      "status": "INFERRED",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "PRC-01",
+      "status": "SUPPORTED",
+      "verdict": "partially_supported",
+      "reasoning": "The evidence states that the proposal exceeds the EUR 100,000 approval threshold and requires approvals from Business, Procurement, Finance, and Technology Investment Committee, which matches the claim. However, the evidence does not specify the exact year-one total amount of EUR 997,000 or reference policy PR-001 s2 explicitly. Therefore, the main point about the approval requirements is supported, but the specific amount and policy citation are not confirmed.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-pricing#s7#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "PRC-02",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "PRC-03",
+      "status": "SUPPORTED",
+      "verdict": "partially_supported",
+      "reasoning": "The evidence shows that the vendor states a 7% discount for a 36-month prepaid agreement and provides pricing figures for different packages plus implementation and support costs. However, the total cost of ownership of EUR 2,821,000 for 3 years and 2000 users is not explicitly stated or traceable in the evidence provided. The pricing details do not sum up to the claimed total cost, and the number of users is not mentioned.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-pricing#s6#c1",
+          "problems": []
+        },
+        {
+          "chunk_id": "vendor-x-pricing#s5#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "PRC-04",
+      "status": "SUPPORTED",
+      "verdict": "unsupported",
+      "reasoning": "The evidence states that the vendor's proposal requires Technology Investment Committee approval and other approvals but does not mention processing Confidential data or requiring Information Security approval before contract signature as per policy PR-001 s3. Therefore, the evidence does not support the claim.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-pricing#s7#c1",
+          "problems": [
+            "not_supportive"
+          ]
+        }
+      ]
+    },
+    {
+      "control_id": "INCIDENT-NOTIFICATION",
+      "status": "NON_COMPLIANT",
+      "verdict": "supported",
+      "reasoning": "The evidence states that the contract requires customer notification within 72 hours of confirmed impact unless law requires sooner. The claim that this does not meet the 24-hour requirement is implied but not explicitly stated in the evidence. The status label NON_COMPLIANT is consistent with the evidence since the contract's 72-hour notification does not meet a 24-hour requirement. Therefore, the claim and status label are supported by the evidence.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sD#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "VULNERABILITY-REMEDIATION",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence states that the vendor's critical vulnerability remediation target is 14 days and the high vulnerability target is 45 days, which matches the claim exactly. The status label 'SUPPORTED' is appropriate because the vendor's evidence satisfies the requirement.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sC#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "DATA-RETENTION-OPTIONS",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "vendor-x-proposal#s4#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "SUBPROCESSOR-LIST-AVAILABILITY",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sF#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "PROVIDER-TRAINING-PROHIBITION",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence directly states that the vendor (Asteria) claims enterprise customer prompts and uploaded documents are not used to train foundation models, which matches the claim. There is no contradictory or missing detail in the evidence regarding the status label 'SUPPORTED'.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-proposal#s3#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "AI-GOVERNANCE-CONTROLS",
+      "status": "SUPPORTED",
+      "verdict": "supported",
+      "reasoning": "The evidence states that the Enterprise Plus add-on includes customer-managed keys and enhanced audit export, which are AI governance controls. This directly supports the claim that AI governance controls are included in the Enterprise Plus add-on. The status label 'SUPPORTED' is appropriate as the vendor document explicitly states these features.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-pricing#s2#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "LEG-01",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sE#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "LEG-02",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "LEG-03",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sF#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "LEG-04",
+      "status": "NON_COMPLIANT",
+      "verdict": "supported",
+      "reasoning": "The evidence states that the vendor contract specifies incident notification within 72 hours of confirmed impact, which matches the claim. The claim also states this does not meet the 24-hour notification requirement, which is implied by the claim and the status label NON_COMPLIANT. The evidence supports the vendor's statement about the 72-hour notification but does not explicitly mention the 24-hour requirement; however, the claim and status label are consistent with the evidence showing the requirement is not met.",
+      "citations": [
+        {
+          "chunk_id": "vendor-x-security-questionnaire#sD#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "LEG-05",
+      "status": "INFERRED",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "LEG-INTEGRITY",
+      "status": "INFERRED",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "AIG-01",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": []
+    },
+    {
+      "control_id": "AIG-02",
+      "status": "SUPPORTED",
+      "verdict": "partially_supported",
+      "reasoning": "The claim states that the use case processes confidential data, classifying it as High risk according to the NFS AI risk tiers policy. Evidence [1] is an NFS policy document that states the requirement: systems processing Confidential/Restricted information are High risk. However, the evidence does not provide any information about the vendor's actual use case or whether it processes confidential data. Therefore, the evidence supports the policy part of the claim but does not support the vendor's status label that the vendor's evidence satisfies the requirement.",
+      "citations": [
+        {
+          "chunk_id": "ai-governance-policy#s2#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "AIG-03",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "ai-governance-policy#s3#c1",
+          "problems": []
+        }
+      ]
+    },
+    {
+      "control_id": "AIG-04",
+      "status": "MISSING",
+      "verdict": "not_applicable",
+      "reasoning": null,
+      "citations": [
+        {
+          "chunk_id": "ai-governance-policy#s6#c1",
+          "problems": []
+        }
+      ]
+    }
+  ]
+}

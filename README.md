@@ -32,6 +32,33 @@ report and approve or reject it (API docs: http://127.0.0.1:8020/docs).
 
 Assessments are kept in memory: restarting the app forgets them.
 
+## Observability — Langfuse
+
+Handout §11 asks for Azure Application Insights; this project uses **Langfuse** instead, run locally
+from `docker-compose.langfuse.yml` (its own Compose project, so `down --volumes` never deletes traces).
+
+```bash
+uv run scripts/deploy.py langfuse        # start it (first run pulls ~2 GB) -> http://localhost:3020
+uv run scripts/deploy.py                 # the app picks up the LANGFUSE_* keys from .env
+```
+
+Login `admin@hackathon2.local` / `hackathon2-langfuse` (local demo values; the project and its API keys
+are created on first start and match `.env.example`). Each assessment is **one trace**
+(`vendor-assessment`):
+
+| §11 asks for | In the trace |
+|---|---|
+| agent workflow executions | the root span: request in, outcome out; ERROR level on a failed run |
+| LLM calls, latency, tokens | a generation per model call (orchestrator and specialists), with tokens and cost |
+| MCP/tool calls, specialist interactions, duration | a tool observation per MCP call; each specialist runs under the `task` tool |
+| exceptions, failed paths | `run_status`, `gate_blocked`, `degraded` scores; the error as status message |
+| evaluation results | `evaluation.live` scores the run's own trace (`assessment.*`, `grounding.*`); other suites get an `evaluation:<suite>` trace |
+| human review | `awaiting_human_review`, then `human_decision` when the reviewer decides |
+
+`/health` reports `tracing: langfuse` when the keys are set. Tracing is optional and fail-safe: blank
+keys or `LANGFUSE_TRACING_ENABLED=false` turn it off, and an unreachable Langfuse never affects a run.
+Code: `src/hackathon2/observability.py`. For Langfuse Cloud, see the comments in `.env.example`.
+
 PowerShell / bash shortcuts do the same thing: `.\scripts\deploy.ps1` · `bash scripts/deploy.sh`.
 
 ## The deploy script — one pass, every time
@@ -41,6 +68,7 @@ PowerShell / bash shortcuts do the same thing: `.\scripts\deploy.ps1` · `bash s
 | `uv run scripts/deploy.py` | preflight (starts Docker Desktop if needed, fills `.env`) → `uv lock --check` + pytest → rebuild image → start Postgres/pgvector → force-recreate the app → wait until `/health` reports **this run's image tag** |
 | `uv run scripts/deploy.py status` | containers + live `/health` |
 | `uv run scripts/deploy.py down [--volumes]` | stop the local stack (`--volumes` also wipes the DB) |
+| `uv run scripts/deploy.py langfuse` · `langfuse-down [--volumes]` | start / stop local Langfuse (`--volumes` also wipes the traces) |
 
 Flags: `--dry-run` (print every mutating command, run only read-only checks) · `--skip-tests` ·
 `--no-cache` (rebuild all layers, re-pull bases) · `--tag TAG` · `--yes` · `--timeout SECONDS`.
@@ -57,6 +85,7 @@ Plain Docker works too: `docker compose up -d --build` (images are then tagged `
 ```
 src/hackathon2/        the service (FastAPI, uvicorn --factory)
   config.py            all settings (env / .env)          llm.py       Azure OpenAI chat + embeddings
+  observability.py     Langfuse tracing + scores
   health.py            /health subsystem checks             service.py   API + /ui (static/index.html)
   agents/              orchestrator + specialists, decision gate adapter, recording
   mcp_server/          NFS MCP server (tools, resources, prompts) + the agents' stdio client
@@ -70,6 +99,7 @@ scripts/               deploy.py (+ .ps1/.sh wrappers)
 .github/workflows/     ci.yml -- lint, tests, image smoke test on PRs (currently disabled)
 Dockerfile             multi-stage, uv --locked, non-root, HEALTHCHECK
 docker-compose.yml     app + Postgres/pgvector
+docker-compose.langfuse.yml   local Langfuse (tracing UI on :3020)
 ```
 
 ## Local development without Docker

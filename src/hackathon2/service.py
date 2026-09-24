@@ -14,12 +14,14 @@ Assessments live in the runner's memory: a restart forgets them.
 """
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
-from hackathon2 import __version__
+from hackathon2 import __version__, observability
 from hackathon2.agents.runner import AssessmentRunner
 from hackathon2.config import Settings, get_settings
 from hackathon2.health import check_database, count_knowledge_documents
@@ -38,9 +40,15 @@ def create_app(settings: Settings | None = None, runner: AssessmentRunner | None
     settings = settings or get_settings()
     logging.basicConfig(level=settings.log_level.upper())
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        observability.get_tracer().flush()  # the last runs' spans, before the process exits
+
     app = FastAPI(
         title="Hackathon 2 - Vendor Risk & Procurement Deep Agent",
         version=__version__,
+        lifespan=lifespan,
     )
 
     def get_runner() -> AssessmentRunner:
@@ -79,6 +87,7 @@ def create_app(settings: Settings | None = None, runner: AssessmentRunner | None
                 "llm": "configured" if settings.llm_configured else "not_configured",
                 "database": check_database(settings),
                 "knowledge_documents": count_knowledge_documents(settings),
+                "tracing": "langfuse" if settings.tracing_configured else "not_configured",
             },
         }
 

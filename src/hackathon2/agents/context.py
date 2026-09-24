@@ -40,6 +40,7 @@ class RunContext:
     llm_calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    trace_id: str | None = None  # the run's Langfuse trace (observability.py)
 
     @property
     def degraded(self) -> bool:
@@ -79,6 +80,7 @@ class RunContext:
             tools_called=list(self.tools_called),
             subagents_called=subagents_called,
             retrieved_chunk_ids=sorted(self.retrieved_chunk_ids),
+            trace_id=self.trace_id,
         )
 
 
@@ -139,7 +141,9 @@ def instrument_tool(tool: BaseTool, ctx: RunContext) -> BaseTool:
     async def _run(**kwargs: Any) -> str:
         ctx.tools_called.append(tool.name)
         try:
-            raw = await tool.ainvoke(kwargs)
+            # No callbacks: this wrapper's own run is the tool call tracers see (with its input
+            # and output); inheriting them would log every call twice, nested in itself.
+            raw = await tool.ainvoke(kwargs, config={"callbacks": []})
         except Exception as exc:  # noqa: BLE001 -- FR14: a failing tool must not crash the assessment
             logger.warning("tool %s failed: %s: %s", tool.name, type(exc).__name__, exc)
             result = ToolResult.fail(
